@@ -1,0 +1,46 @@
+name: Renewal alerts
+
+# Opens a GitHub issue for every subscription inside its reminder window.
+# GitHub notifies you about new issues by email and in the mobile app.
+on:
+  schedule:
+    # 13:00 UTC = 8 AM US Central (CDT). Adjust to taste.
+    - cron: '0 13 * * *'
+  push:
+    branches: [main]
+    paths: ['data/subscriptions.json']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report what would be opened
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: renewal-alerts
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check renewals and open issues
+        run: npm run renewals
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only needed if you encrypt the file in the app (Sync → Encrypt).
+          TALLY_PASSPHRASE: ${{ secrets.TALLY_PASSPHRASE }}
+          # Encrypted files get generic issue titles; set this variable to 0 to show names.
+          TALLY_REDACT: ${{ vars.TALLY_REDACT }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          # "Today" is computed in this timezone. Set a repo variable TZ to override.
+          TZ: ${{ vars.TZ || 'America/Chicago' }}

@@ -1,0 +1,15 @@
+# Tally helpdesk proxy. See README.md in this folder.
+name = "tally-helpdesk"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+# Your site's address (no trailing slash). Several? Separate with commas.
+ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io"
+# Questions per visitor (IP) per hour.
+RATE_LIMIT = "30"
+
+# Secrets are NOT stored here. Set one with:
+#   npx wrangler secret put GEMINI_API_KEY
+# or
+#   npx wrangler secret put ANTHROPIC_API_KEY

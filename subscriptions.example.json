@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "currency": "USD",
+  "updated": "2026-09-23T12:00:00.000Z",
+  "subscriptions": [
+    {
+      "id": "demo1",
+      "name": "Netflix Premium",
+      "amount": 2499,
+      "cycle": "monthly",
+      "anchor": "2026-09-27",
+      "category": "Entertainment",
+      "leadDays": 3,
+      "status": "active",
+      "usage": "weekly"
+    },
+    {
+      "id": "demo2",
+      "name": "GitHub Copilot",
+      "amount": 1000,
+      "cycle": "monthly",
+      "anchor": "2026-10-05",
+      "category": "Developer Tools",
+      "leadDays": 3,
+      "status": "active",
+      "usage": "daily"
+    },
+    {
+      "id": "demo3",
+      "name": "Gym Membership",
+      "amount": 4500,
+      "cycle": "monthly",
+      "anchor": "2026-09-24",
+      "category": "Health & Fitness",
+      "leadDays": 5,
+      "status": "active",
+      "usage": "rarely"
+    },
+    {
+      "id": "demo4",
+      "name": "Cloud Hosting",
+      "amount": 12000,
+      "cycle": "annual",
+      "anchor": "2026-10-11",
+      "category": "Utilities",
+      "leadDays": 14,
+      "status": "active",
+      "usage": "monthly"
+    },
+    {
+      "id": "demo5",
+      "name": "Language App",
+      "amount": 1299,
+      "cycle": "monthly",
+      "anchor": "2026-09-25",
+      "category": "News & Learning",
+      "leadDays": 2,
+      "status": "trial",
+      "trialEnds": "2026-09-25",
+      "usage": "never"
+    },
+    {
+      "id": "demo6",
+      "name": "Music Streaming",
+      "amount": 1199,
+      "cycle": "monthly",
+      "anchor": "2026-10-15",
+      "category": "Entertainment",
+      "leadDays": 3,
+      "status": "active",
+      "usage": "daily"
+    }
+  ]
+}

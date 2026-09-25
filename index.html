@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Tally</title>
+    <meta name="description" content="A local-first money dashboard: subscriptions, fair group splits and a tax-aware cart, with GitHub renewal alerts." />
+    <meta name="theme-color" content="#E9EEE8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0F1620" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Tally" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <style>
+      /* Hidden at first so it never flashes during a normal start. */
+      .boot-hint { position: absolute; left: 0; right: 0; top: 12vh; max-width: 40rem; margin: 0 auto; padding: 0 16px; font: 16px/1.6 system-ui, sans-serif; color: #1c2b45; opacity: 0; animation: boot-hint 0.3s ease 2.5s forwards; }
+      .boot-hint h1 { font: 600 1.6rem/1.2 Georgia, serif; }
+      .boot-hint code { font-size: 0.9em; background: #eef2ec; padding: 0 4px; border-radius: 4px; }
+      @keyframes boot-hint { to { opacity: 1; } }
+    </style>
+    <script>
+      // Set the theme before first paint to avoid a flash.
+      try {
+        var s = JSON.parse(localStorage.getItem('tally:v2') || '{}');
+        var t = (s.settings && s.settings.theme) || 'system';
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <!--
+        Shown only if the app never starts (the app replaces #app on boot).
+        The usual cause on GitHub Pages is publishing the source files instead
+        of the built app, which is exactly what this explains.
+      -->
+      <div class="boot-hint" role="alert">
+        <h1>Tally didn’t start</h1>
+        <p>If this is your site, GitHub Pages is publishing the project’s source files instead of the built app. To fix it:</p>
+        <ol>
+          <li>Make sure <code>package.json</code>, <code>index.html</code> and the <code>.github</code> folder are at the <strong>top level</strong> of the repository, not inside a subfolder.</li>
+          <li>Open the repository’s <strong>Settings → Pages</strong>, and under <em>Build and deployment</em> set <strong>Source</strong> to <strong>GitHub Actions</strong>.</li>
+          <li>Open the <strong>Actions</strong> tab, choose <em>Deploy app to GitHub Pages</em>, and click <strong>Run workflow</strong>. The site updates in about a minute.</li>
+        </ol>
+        <p>Visitors: try again in a few minutes, or use a current version of Chrome, Edge, Safari or Firefox.</p>
+      </div>
+    </div>
+    <noscript>Tally needs JavaScript to run. All of your data stays in this browser.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

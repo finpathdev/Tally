@@ -1,0 +1,39 @@
+{
+  "name": "tally",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local-first money dashboard: subscriptions, fair group splits, and a tax-aware grocery cart \u2014 with real GitHub Actions renewal alerts.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "renewals": "tsx scripts/renewal-check.ts",
+    "e2e": "playwright test",
+    "lighthouse": "lhci autorun"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "^5.0.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.3.0",
+    "@fontsource/gloock": "^5.3.0",
+    "@fontsource/martian-mono": "^5.3.0"
+  }
+}
