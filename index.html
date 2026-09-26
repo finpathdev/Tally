@@ -84,7 +84,7 @@ function addDays(date, days) {
 function daysBetween(a, b) {
 	return Math.round((toUTC(b) - toUTC(a)) / DAY_MS);
 }
-function daysInMonth(y, m0) {
+function daysInMonth$1(y, m0) {
 	return new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
 }
 /** Add calendar months, clamping to month end (Jan 31 + 1 month → Feb 28/29). */
@@ -93,7 +93,7 @@ function addMonths(date, months) {
 	const total = y * 12 + (m - 1) + months;
 	const ny = Math.floor(total / 12);
 	const nm0 = total - ny * 12;
-	const nd = Math.min(d, daysInMonth(ny, nm0));
+	const nd = Math.min(d, daysInMonth$1(ny, nm0));
 	return fromUTC(Date.UTC(ny, nm0, nd));
 }
 /** The k-th renewal after `anchor` (k = 0 is the anchor itself). */
@@ -300,6 +300,11 @@ function emptyState() {
 			taxRateBps: 825,
 			budget: 1e4
 		},
+		budget: {
+			spending: [],
+			limits: {},
+			goals: []
+		},
 		sync: {
 			owner: "",
 			repo: "",
@@ -490,7 +495,160 @@ function demoState(on = today()) {
 			inBasket: false
 		}
 	];
+	s.budget = demoBudget(on);
 	return s;
+}
+/**
+* About three months of everyday spending, so budgets and insights have
+* something to show. Amounts vary a little month to month, and dining out
+* climbs, which gives the insights something real to notice.
+*/
+function demoBudget(on) {
+	const month = on.slice(0, 7);
+	const day = Number(on.slice(8));
+	const at = (monthsBack, d) => {
+		const [y, m] = month.split("-").map(Number);
+		const first = new Date(Date.UTC(y, m - 1 - monthsBack, 1));
+		const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+		if (monthsBack === 0 && d > day) return null;
+		return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, last))).toISOString().slice(0, 10);
+	};
+	const plan = [
+		[
+			2,
+			11e4,
+			"Housing",
+			"Rent share",
+			"bank"
+		],
+		[
+			3,
+			8640,
+			"Groceries",
+			"Green Valley Market",
+			"receipt"
+		],
+		[
+			6,
+			2375,
+			"Dining out",
+			"Corner Café",
+			"manual"
+		],
+		[
+			8,
+			4500,
+			"Transport",
+			"Transit pass",
+			"bank"
+		],
+		[
+			10,
+			6412,
+			"Groceries",
+			"Green Valley Market",
+			"receipt"
+		],
+		[
+			12,
+			3850,
+			"Dining out",
+			"Pizza night",
+			"manual"
+		],
+		[
+			14,
+			7230,
+			"Bills",
+			"Electricity",
+			"bank"
+		],
+		[
+			15,
+			2999,
+			"Shopping",
+			"Phone case",
+			"bank"
+		],
+		[
+			17,
+			9105,
+			"Groceries",
+			"Weekly shop",
+			"cart"
+		],
+		[
+			19,
+			1600,
+			"Fun",
+			"Cinema",
+			"manual"
+		],
+		[
+			21,
+			4280,
+			"Dining out",
+			"Birthday dinner",
+			"manual"
+		],
+		[
+			24,
+			5860,
+			"Groceries",
+			"Green Valley Market",
+			"receipt"
+		],
+		[
+			27,
+			2400,
+			"Health",
+			"Pharmacy",
+			"bank"
+		]
+	];
+	const spending = [];
+	for (const back of [
+		2,
+		1,
+		0
+	]) {
+		const growth = 1 + (2 - back) * .08;
+		for (const [d, amount, category, note, source] of plan) {
+			const date = at(back, d);
+			if (!date) continue;
+			const scale = category === "Dining out" ? growth * (back === 1 ? 1.35 : 1) : 1 - (d + back) % 3 * .04;
+			spending.push({
+				id: uid(),
+				date,
+				amount: category === "Housing" ? amount : Math.round(amount * scale),
+				category,
+				note,
+				source
+			});
+		}
+	}
+	return {
+		spending,
+		limits: {
+			Groceries: 35e3,
+			"Dining out": 12e3,
+			Transport: 6e3,
+			Fun: 8e3,
+			Subscriptions: 12e3
+		},
+		goals: [{
+			id: uid(),
+			name: "Emergency fund",
+			target: 3e5,
+			saved: 185e3
+		}, {
+			id: uid(),
+			name: "Trip to Lisbon",
+			target: 12e4,
+			saved: 34e3,
+			by: addDays(on, 200)
+		}]
+	};
 }
 var SchemaError = class extends Error {};
 var isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -517,6 +675,44 @@ var STATUSES = [
 	"trial",
 	"paused"
 ];
+var SOURCES = [
+	"manual",
+	"receipt",
+	"bank",
+	"cart"
+];
+function parseBudget(v) {
+	const b = isObj(v) ? v : {};
+	const limits = {};
+	if (isObj(b.limits)) for (const [k, x] of Object.entries(b.limits)) limits[k] = int(x, `budget.limits.${k}`);
+	return {
+		spending: arr(b.spending ?? [], "budget.spending").map((x, i) => {
+			const w = `budget.spending[${i}]`;
+			if (!isObj(x)) throw new SchemaError(w);
+			return {
+				id: str(x.id, `${w}.id`),
+				date: date(x.date, `${w}.date`),
+				amount: int(x.amount, `${w}.amount`),
+				category: str(x.category ?? "Other", `${w}.category`),
+				note: str(x.note ?? "", `${w}.note`),
+				source: oneOf(x.source ?? "manual", SOURCES, `${w}.source`)
+			};
+		}),
+		limits,
+		goals: arr(b.goals ?? [], "budget.goals").map((x, i) => {
+			const w = `budget.goals[${i}]`;
+			if (!isObj(x)) throw new SchemaError(w);
+			const g = {
+				id: str(x.id, `${w}.id`),
+				name: str(x.name, `${w}.name`),
+				target: int(x.target, `${w}.target`),
+				saved: int(x.saved ?? 0, `${w}.saved`)
+			};
+			if (x.by !== void 0) g.by = date(x.by, `${w}.by`);
+			return g;
+		})
+	};
+}
 function parseSubscription(v, where = "subscription") {
 	if (!isObj(v)) throw new SchemaError(`${where} must be an object`);
 	const sub = {
@@ -645,6 +841,7 @@ function parseV2(v) {
 			taxRateBps: int(cart.taxRateBps ?? base.cart.taxRateBps, "cart.taxRateBps"),
 			budget: int(cart.budget ?? base.cart.budget, "cart.budget")
 		},
+		budget: parseBudget(v.budget),
 		sync: {
 			owner: str(sync.owner ?? "", "sync.owner"),
 			repo: str(sync.repo ?? "", "sync.repo"),
@@ -2042,6 +2239,7 @@ var SECTIONS = [
 	"Subscriptions",
 	"Split",
 	"Cart",
+	"Budget",
 	"Sync & alerts",
 	"App & reminders",
 	"Privacy & data",
@@ -2063,11 +2261,12 @@ var ARTICLES = [
 			"what is this"
 		],
 		summary: "Tally keeps track of the money that repeats: subscriptions you pay for, costs you share with friends, and a shopping list that shows the real total with tax.",
-		body: `Tally has four sections:
+		body: `Tally has five main sections:
 
 - **Subscriptions**: everything you pay for on a schedule, what it costs per month and year, when it next charges, and which ones deserve a second look.
 - **Split**: shared costs with friends or housemates, split fairly, and the fewest payments needed to settle up.
 - **Cart**: a shopping list that adds sales tax and warns you before you go over budget.
+- **Budget**: monthly budgets per category, savings goals, charts of where your money goes, and receipt scanning.
 - **Sync**: optional. Saves your subscriptions to your own GitHub repository and sends renewal alerts.
 
 Everything is saved in this browser. Nothing is uploaded unless you use Sync or share a link.`
@@ -2126,9 +2325,9 @@ You can also use the **undo arrow** at the top right, or press **U** on a keyboa
 			"keyboard",
 			"faster"
 		],
-		summary: "Press 1–5 to switch sections, N to add something, H to ask the help desk, U to undo, T to change the theme, and ? to see the list.",
-		body: `- **1–5**: switch between Subscriptions, Split, Cart, Sync and Help
-- **N**: add a subscription, log an expense, or jump to the cart's add row
+		summary: "Press 1–6 to switch sections, N to add something, H to ask the help desk, U to undo, T to change the theme, and ? to see the list.",
+		body: `- **1–6**: switch between Subscriptions, Split, Cart, Budget, Sync and Help
+- **N**: add a subscription, log an expense or spending, or jump to the cart's add row
 - **H**: ask the help desk
 - **U**: undo the last change
 - **T**: switch between system, light and dark theme
@@ -2601,6 +2800,175 @@ If you go over budget, Tally suggests the smallest item to leave out.`,
 Rules differ by place: many US states exempt basic groceries but tax things like cleaning supplies and soda. Click an item's **Taxed / No tax** label to switch it. If you're unsure of your rate, search "[your city] sales tax rate".`
 	},
 	{
+		id: "budgets",
+		section: "Budget",
+		title: "Set monthly budgets",
+		keywords: [
+			"budget",
+			"limit",
+			"spending limit",
+			"monthly budget",
+			"category",
+			"overspend",
+			"over budget",
+			"how much can i spend"
+		],
+		summary: "On the Budget tab, click Set budgets (or Edit) and enter a monthly limit for the categories you want to watch. Each gets a bar showing what you've spent, and a label: On track, Watch it or Over.",
+		body: `Open **Budget** and click **Set budgets**. Enter a monthly limit for any category; leave the rest blank. The grey suggestion is your average over the last three months.
+
+Each budget shows:
+
+- **What you've spent** this month, against the limit.
+- A label: **On track**, **Watch it** (85% used, or on pace to go over) or **Over**.
+- A thin marker on the bar showing where you'll end the month **at your current pace**.
+
+Your subscriptions count toward the **Subscriptions** category automatically, on the day each one charges.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
+		id: "budget-pace",
+		section: "Budget",
+		title: "What \"on pace for\" means",
+		keywords: [
+			"pace",
+			"projected",
+			"projection",
+			"on track",
+			"watch it",
+			"forecast spending",
+			"end of month"
+		],
+		summary: "It's what you'll have spent by the end of the month if you keep spending at the same daily rate. It starts after the first week, so one big shop early in the month doesn't set off alarms.",
+		body: `Tally divides what you've spent so far by the days gone, then multiplies by the days in the month. For example, $150 spent by the 15th of a 30-day month is on pace for **$300**.
+
+- It only kicks in from the **7th** of the month; before that, a single shop would skew it.
+- For **Subscriptions** the pace is exact: it's every charge scheduled this month.
+- A budget shows **Watch it** when the pace is above the limit, even if you're still under it today.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
+		id: "log-spending",
+		section: "Budget",
+		title: "Log spending, or import it from your bank",
+		keywords: [
+			"add spending",
+			"expense",
+			"transaction",
+			"record purchase",
+			"bank csv",
+			"import spending",
+			"categorise",
+			"categorize",
+			"edit spending",
+			"delete spending"
+		],
+		summary: "Click Log spending on the Budget tab, scan a receipt, check out your cart, or use Import bank CSV. Imports guess each category, skip charges you've already logged, and skip your tracked subscriptions.",
+		body: `There are four ways to add spending:
+
+1. **Log spending**: type the amount, date, category and a note.
+2. **Scan a receipt**: see [Scan a receipt](#/help/receipt-scan).
+3. **Cart**: tick items into the basket, then click **Paid? Log it**. The basket total (with tax) is logged under Groceries.
+4. **Import bank CSV**: download your transactions as CSV from your bank and choose the file. Tally guesses a category for each charge from the merchant name.
+
+Imports are safe to repeat: charges already logged are skipped, and so are charges that match a subscription you track, because those already count automatically. To fix a category, click the pencil next to the entry.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
+		id: "receipt-scan",
+		section: "Budget",
+		title: "Scan a receipt",
+		keywords: [
+			"receipt",
+			"scan",
+			"photo",
+			"camera",
+			"ocr",
+			"read receipt",
+			"picture",
+			"snap"
+		],
+		summary: "Click Scan a receipt (on Budget, Cart or Split), take or choose a photo, check the lines Tally read, then log it as spending, add it to the cart, or split it with your group. The photo is read on your device and never uploaded.",
+		body: `1. Click **Scan a receipt** on the Budget, Cart or Split tab.
+2. **Take a photo** or choose one. Flat, sharp and well lit works best.
+3. Check the lines. Tally compares them with the printed total and tells you if something doesn't add up, so you can fix a misread amount.
+4. Choose what to do: **Log spending**, **Add to cart**, or **Split it** with your group.
+
+**Privacy:** the photo is read by a text-recognition engine running in your browser. It's never uploaded or stored. The engine itself (about 5 MB) downloads from a public code library the first time you scan, then it's cached.
+
+No camera? Open the **paste the receipt's text** option and paste the text instead.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
+		id: "goals",
+		section: "Budget",
+		title: "Savings goals",
+		keywords: [
+			"goal",
+			"save",
+			"saving",
+			"target",
+			"save up",
+			"emergency fund",
+			"how much to save",
+			"per month"
+		],
+		summary: "Click New goal on the Budget tab, enter a target and, optionally, a date. Tally tells you how much to put aside each month, and you click Add money as you save.",
+		body: `A goal has a **target**, what you've **saved so far**, and an optional **date**.
+
+- With a date, Tally divides what's left by the months remaining: $900 to go in 6 months is **$150 a month**.
+- Click **Add money** whenever you put some aside. Use a minus sign to take money out.
+- If the date passes before you get there, Tally says so; pick a new date for a fresh monthly amount.
+
+Tally doesn't move real money. Goals are a plan you keep up to date.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
+		id: "insights",
+		section: "Budget",
+		title: "Spending insights and saving tips",
+		keywords: [
+			"insights",
+			"tips",
+			"chart",
+			"where does my money go",
+			"save money",
+			"yearly billing",
+			"annual plan",
+			"trend",
+			"compare months"
+		],
+		summary: "The Insights card charts where your money went this month and your last six months, and suggests savings, such as cancelling subscriptions you rarely use or switching the ones you keep to yearly billing.",
+		body: `**Charts**
+
+- **Where it went**: this month's spending by category, including subscriptions.
+- **Last six months**: your total each month, with your average as a dashed line. Click a month to see it.
+
+**Tips** (each shows its arithmetic)
+
+- **Cancel what you barely use**: subscriptions marked as used rarely or never, and what cancelling saves a year.
+- **Switch to yearly billing**: many services include about two months free on a yearly plan. Tally estimates the saving; check each service's actual price first.
+- Budgets that are over, or **on pace** to go over, and categories that jumped last month.`,
+		link: {
+			label: "Open Budget",
+			href: "#/budget"
+		}
+	},
+	{
 		id: "sync-overview",
 		section: "Sync & alerts",
 		title: "What Sync does (and whether you need it)",
@@ -2813,6 +3181,8 @@ Data only leaves the device when you:
 - **Share a split link**: the group is inside the link itself; incomes are left out.
 - **Use today's rate**: asks the European Central Bank rates service for one number; no personal data is sent.
 - **Ask the AI assistant** with a cloud AI: your question is sent to that provider. Your Tally data is only included if you turn on **Share my Tally data**.
+
+**Scanning a receipt** doesn't send anything: the photo is read in your browser. The first scan downloads the text-recognition engine from a public code library (jsDelivr); no photo or data goes with that request.
 
 Clearing your browser's site data deletes Tally's data, so download a backup now and then.`
 	},
@@ -3158,6 +3528,37 @@ var GLOSSARY = [
 		aliases: [],
 		definition: "The most you want to spend on this shopping trip. The bar turns amber at 80% and red when you go over.",
 		article: "cart-basics"
+	},
+	{
+		id: "budget-pace",
+		term: "On pace for",
+		aliases: [
+			"pace",
+			"projected",
+			"monthly budgets",
+			"watch it",
+			"on track"
+		],
+		definition: "What you'll have spent by the end of the month if you keep spending at today's daily rate. Tally starts estimating after the first week.",
+		article: "budget-pace"
+	},
+	{
+		id: "savings-goal",
+		term: "Savings goal",
+		aliases: ["goal", "target"],
+		definition: "An amount you want to save, optionally by a date. Tally works out how much to put aside each month.",
+		article: "goals"
+	},
+	{
+		id: "receipt-scan",
+		term: "Receipt scanning",
+		aliases: [
+			"scan",
+			"ocr",
+			"text recognition"
+		],
+		definition: "Reading the items and total from a photo of a receipt. Tally does this in your browser; the photo is never uploaded.",
+		article: "receipt-scan"
 	},
 	{
 		id: "repository",
@@ -3779,6 +4180,254 @@ function memberSummary(members, expenses) {
 	return out;
 }
 //#endregion
+//#region src/lib/budget.ts
+/**
+* Budgets, savings goals and spending insights.
+*
+* Spending comes from two places: entries you log (typed in, scanned from a
+* receipt, imported from a bank CSV, or checked out from the cart), and your
+* subscriptions, whose actual charges in a month count toward the
+* "Subscriptions" category automatically. Subscription charges are never
+* logged as entries, so nothing is counted twice.
+*/
+var SUBSCRIPTIONS_CATEGORY = "Subscriptions";
+var SPEND_CATEGORIES = [
+	"Groceries",
+	"Dining out",
+	"Transport",
+	"Housing",
+	"Bills",
+	"Shopping",
+	"Fun",
+	"Health",
+	"Travel",
+	"Other"
+];
+/** Every category a budget can be set on. */
+var BUDGET_CATEGORIES = [...SPEND_CATEGORIES, SUBSCRIPTIONS_CATEGORY];
+/** "2026-09-23" → "2026-09" */
+var monthOf = (date) => date.slice(0, 7);
+function monthStart(month) {
+	return `${month}-01`;
+}
+function monthEnd(month) {
+	const [y, m] = month.split("-").map(Number);
+	return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+var daysInMonth = (month) => Number(monthEnd(month).slice(8));
+function shiftMonth(month, n) {
+	return monthOf(addMonths(monthStart(month), n));
+}
+/** The `count` months ending with `last`, oldest first. */
+function lastMonths(last, count) {
+	return Array.from({ length: count }, (_, i) => shiftMonth(last, i - count + 1));
+}
+/** Subscription charges that actually land in a month. */
+function subscriptionSpend(subs, month, through) {
+	const end = through && through < monthEnd(month) ? through : monthEnd(month);
+	return subscriptionCharges(subs, monthStart(month), end).reduce((a, c) => a + c.amount, 0);
+}
+/** What a subscription cost on a date, using its price history. */
+function priceOn(sub, date) {
+	for (const p of sub.history ?? []) if (date < p.until) return p.amount;
+	return sub.amount;
+}
+/**
+* Charges in [start, end], including ones before the date you entered as the
+* next charge: a subscription you track today was almost always billing
+* before you added it, and past months' budgets should reflect that. Trials
+* have no earlier charges.
+*/
+function subscriptionCharges(subs, start, end) {
+	const minDays = {
+		weekly: 7,
+		monthly: 28,
+		quarterly: 89,
+		annual: 365
+	};
+	const out = [];
+	for (const sub of subs.filter(isBilling)) {
+		if (sub.anchor <= start || sub.status === "trial") {
+			for (const e of renewalsBetween([sub], start, end)) out.push({
+				sub,
+				date: e.date,
+				amount: priceOn(sub, e.date)
+			});
+			continue;
+		}
+		const back = Math.ceil(daysBetween(start, sub.anchor) / minDays[sub.cycle]) + 1;
+		for (let k = -back;; k++) {
+			const date = nthOccurrence(sub.anchor, sub.cycle, k);
+			if (date > end) break;
+			if (date >= start) out.push({
+				sub,
+				date,
+				amount: priceOn(sub, date)
+			});
+		}
+	}
+	return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+/**
+* Spending per category for one month, largest first. Subscriptions are
+* included as their own category; pass `through` (today) so charges later
+* this month don't count as spent yet.
+*/
+function spentByCategory(spending, subs, month, through) {
+	const map = /* @__PURE__ */ new Map();
+	for (const s of spending) if (monthOf(s.date) === month) map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
+	const fromSubs = subscriptionSpend(subs, month, through);
+	if (fromSubs > 0) map.set(SUBSCRIPTIONS_CATEGORY, (map.get("Subscriptions") ?? 0) + fromSubs);
+	return [...map.entries()].map(([category, amount]) => ({
+		category,
+		amount
+	})).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
+}
+function monthTotal(spending, subs, month, through) {
+	return spentByCategory(spending, subs, month, through).reduce((a, c) => a + c.amount, 0);
+}
+/**
+* Progress on one category's monthly budget. `on` is today's date; for a past
+* month the projection is just what was spent.
+*/
+function budgetProgress(category, limit, spending, subs, month, on) {
+	const current = monthOf(on) === month;
+	const amountIn = (through) => spentByCategory(spending, subs, month, through).find((c) => c.category === category)?.amount ?? 0;
+	const spent = amountIn(current ? on : void 0);
+	let projected = spent;
+	if (current && category === "Subscriptions") projected = amountIn();
+	else if (current) {
+		const day = Number(on.slice(8));
+		projected = day >= 7 ? Math.round(spent / day * daysInMonth(month)) : spent;
+	}
+	const pct = limit > 0 ? spent / limit : spent > 0 ? Infinity : 0;
+	const level = spent > limit ? "over" : pct >= .85 || projected > limit ? "warn" : "ok";
+	return {
+		category,
+		limit,
+		spent,
+		remaining: limit - spent,
+		pct,
+		projected,
+		level
+	};
+}
+function allBudgets(state, subs, month, on) {
+	return Object.entries(state.limits).filter(([, limit]) => limit > 0).map(([category, limit]) => budgetProgress(category, limit, state.spending, subs, month, on)).sort((a, b) => b.pct - a.pct || a.category.localeCompare(b.category));
+}
+function goalProgress(goal, on) {
+	const remaining = Math.max(0, goal.target - goal.saved);
+	const done = goal.target > 0 && goal.saved >= goal.target;
+	const pct = goal.target > 0 ? Math.min(1, goal.saved / goal.target) : 0;
+	if (!goal.by) return {
+		pct,
+		remaining,
+		done,
+		monthsLeft: null,
+		perMonth: null,
+		overdue: false
+	};
+	const days = daysBetween(on, goal.by);
+	const overdue = days < 0 && !done;
+	const monthsLeft = Math.max(1, Math.ceil(days / 30.44));
+	return {
+		pct,
+		remaining,
+		done,
+		monthsLeft,
+		perMonth: done ? 0 : Math.ceil(remaining / monthsLeft),
+		overdue
+	};
+}
+var RULES = [
+	[/grocer|supermarket|market|whole ?foods|trader joe|aldi|kroger|safeway|costco|tesco|sainsbury|lidl|publix|wegmans|heb\b|food ?lion|walmart ?(neighborhood|grocery)/i, "Groceries"],
+	[/restaurant|cafe|coffee|starbucks|pizza|burger|grill|bistro|diner|bar\b|pub\b|doordash|uber ?eats|grubhub|deliveroo|mcdonald|chipotle|taco|sushi|kitchen|bakery/i, "Dining out"],
+	[/uber(?! ?eats)|lyft|taxi|transit|metro|subway fare|rail|train|parking|shell|chevron|exxon|\bbp\b|fuel|gas station|toll|mta\b|tfl\b/i, "Transport"],
+	[/rent|mortgage|landlord|property|hoa\b|apartment/i, "Housing"],
+	[/electric|water|utility|energy|internet|comcast|xfinity|verizon|at&t|t-mobile|phone bill|insurance|council tax/i, "Bills"],
+	[/amazon|target|walmart|ebay|etsy|best ?buy|ikea|shop|store|mall/i, "Shopping"],
+	[/cinema|movie|theat|concert|ticket|steam|playstation|xbox|nintendo|game/i, "Fun"],
+	[/pharma|cvs|walgreens|doctor|dental|clinic|hospital|health|gym|fitness/i, "Health"],
+	[/airline|airways|hotel|airbnb|booking\.com|expedia|flight|hostel/i, "Travel"]
+];
+/** Best-guess category from a bank description or merchant name. */
+function categorize(description) {
+	for (const [re, cat] of RULES) if (re.test(description)) return cat;
+	return "Other";
+}
+/** Same day, same amount, same note: treat as the same transaction. */
+function spendKey(s) {
+	return `${s.date}|${s.amount}|${s.note.trim().toLowerCase()}`;
+}
+/**
+* Plain-language observations, most valuable first. Every tip explains its
+* arithmetic; nothing is a black box.
+*/
+function insights(state, subs, on, money) {
+	const tips = [];
+	const billing = subs.filter(isBilling);
+	const unused = billing.filter((s) => s.usage === "never" || s.usage === "rarely");
+	if (unused.length) {
+		const saves = unused.reduce((a, s) => a + annualCost(s), 0);
+		tips.push({
+			id: "unused",
+			title: `Cancel what you barely use`,
+			detail: `${unused.map((s) => s.name).join(", ")} ${unused.length === 1 ? "is" : "are"} marked as used rarely or never. Cancelling saves ${money(saves)} a year.`,
+			saves
+		});
+	}
+	const monthlyPlans = billing.filter((s) => s.cycle === "monthly" && s.usage !== "never" && s.usage !== "rarely" && s.status !== "trial");
+	if (monthlyPlans.length) {
+		const saves = Math.round(monthlyPlans.reduce((a, s) => a + annualCost(s), 0) * (2 / 12));
+		if (saves > 0) tips.push({
+			id: "yearly",
+			title: "Switch the ones you keep to yearly billing",
+			detail: `You pay monthly for ${monthlyPlans.length} ${monthlyPlans.length === 1 ? "service" : "services"} you use regularly. Yearly plans often include about two months free, which would be around ${money(saves)} a year. Check each service's price first.`,
+			saves
+		});
+	}
+	const month = monthOf(on);
+	for (const b of allBudgets(state, subs, month, on)) if (b.level === "over") tips.push({
+		id: `over-${b.category}`,
+		title: `${b.category} is over budget`,
+		detail: `${money(b.spent)} spent of ${money(b.limit)} this month, ${money(-b.remaining)} over.`
+	});
+	else if (b.projected > b.limit) tips.push({
+		id: `pace-${b.category}`,
+		title: `${b.category} is on pace to go over`,
+		detail: `At this month's pace you'll spend about ${money(b.projected)}, against a budget of ${money(b.limit)}. Spending ${money(Math.max(0, Math.floor(b.remaining / Math.max(1, daysInMonth(month) - Number(on.slice(8))))))} a day or less for the rest of the month keeps you on track.`
+	});
+	const prev = shiftMonth(month, -1);
+	const before = shiftMonth(month, -2);
+	const a = spentByCategory(state.spending, subs, before);
+	const b = spentByCategory(state.spending, subs, prev);
+	let best = null;
+	for (const c of b) {
+		const from = a.find((x) => x.category === c.category)?.amount ?? 0;
+		const delta = c.amount - from;
+		if (from > 0 && delta > 0 && delta / from >= .2 && (!best || delta > best.delta)) best = {
+			category: c.category,
+			delta,
+			from,
+			to: c.amount
+		};
+	}
+	if (best) tips.push({
+		id: "rise",
+		title: `${best.category} went up last month`,
+		detail: `${money(best.to)}, up ${money(best.delta)} (${Math.round(best.delta / best.from * 100)}%) from the month before.`
+	});
+	for (const g of state.goals) {
+		const p = goalProgress(g, on);
+		if (p.overdue) tips.push({
+			id: `goal-${g.id}`,
+			title: `“${g.name}” passed its date`,
+			detail: `${money(p.remaining)} still to go. Pick a new date to get a fresh monthly amount.`
+		});
+	}
+	return tips.sort((x, y) => (y.saves ?? 0) - (x.saves ?? 0));
+}
+//#endregion
 //#region src/help/prompt.ts
 /**
 * The instructions the AI gets. Answers about *how Tally works* must come
@@ -3787,13 +4436,13 @@ function memberSummary(members, expenses) {
 */
 function buildSystemPrompt(opts) {
 	const ref = opts.reference.map((a) => `### ${a.title}\n${a.body}`).join("\n\n");
-	return `You are the help desk inside Tally, a free, local-first web app for tracking subscriptions, splitting shared costs with friends, and totalling a shopping cart with sales tax. Your job is to explain how to use Tally and what its money terms mean, to people who may not be familiar with finance or technology.
+	return `You are the help desk inside Tally, a free, local-first web app for tracking subscriptions, splitting shared costs with friends, totalling a shopping cart with sales tax, monthly budgets and savings goals, and scanning receipts. Your job is to explain how to use Tally and what its money terms mean, to people who may not be familiar with finance or technology.
 
 How to answer:
 - Plain, friendly language. Short: under 120 words unless step-by-step instructions are needed.
 - For how-to questions, give numbered steps and name buttons and fields exactly as they appear in the reference, in **bold**.
 - For "what does X mean" questions, give a one-sentence definition, then a small example with numbers.
-- Link to a section of the app when helpful, using these exact links: [Subscriptions](#/subscriptions), [Split](#/split), [Cart](#/cart), [Sync](#/sync), [Help](#/help).
+- Link to a section of the app when helpful, using these exact links: [Subscriptions](#/subscriptions), [Split](#/split), [Cart](#/cart), [Budget](#/budget), [Sync](#/sync), [Help](#/help).
 - Only describe Tally features that appear in the reference. If the reference doesn't cover something, say you're not sure Tally does that and suggest checking the Help articles. Never invent buttons, settings or features.
 - You may explain general money ideas (sales tax, free trials, splitting costs, exchange rates). Do not give personal investment, tax or legal advice; for those, suggest a qualified professional.
 - Never ask for passwords, API keys, GitHub tokens or passphrases, and tell the person not to paste them into the chat.
@@ -3832,6 +4481,16 @@ function dataSummary(state, today) {
 	} catch {}
 	const ct = cartTotals(state.cart.items, state.cart.taxRateBps);
 	if (state.cart.items.length) lines.push(`Cart: ${state.cart.items.length} items, subtotal ${m(ct.subtotal)}, tax ${m(ct.tax)} at ${state.cart.taxRateBps / 100}%, total ${m(ct.total)}, budget ${m(state.cart.budget)}.`);
+	const b = state.budget;
+	const month = monthOf(today);
+	const cats = spentByCategory(b.spending, state.subscriptions, month, today);
+	if (cats.length) lines.push(`Spending this month so far: ${cats.map((c) => `${c.category} ${m(c.amount)}`).join(", ")}.`);
+	const budgets = allBudgets(b, state.subscriptions, month, today);
+	if (budgets.length) lines.push(`Budgets this month: ${budgets.map((x) => `${x.category} ${m(x.spent)} of ${m(x.limit)} (${x.level === "ok" ? "on track" : x.level === "warn" ? "watch it" : "over"}, on pace for ${m(x.projected)})`).join("; ")}.`);
+	for (const g of b.goals.slice(0, 10)) {
+		const p = goalProgress(g, today);
+		lines.push(`Goal "${g.name}": ${m(g.saved)} of ${m(g.target)}${g.by ? `, by ${g.by}` : ""}${p.perMonth ? `, needs ${m(p.perMonth)}/month` : ""}.`);
+	}
 	return lines.join("\n");
 }
 /** Human description of the screen for context, e.g. "the Split tab". */
@@ -3841,6 +4500,7 @@ function describeScreen(hash) {
 		subscriptions: "the Subscriptions tab (list of subscriptions, calendar, and bank import)",
 		split: "the Split tab (shared expenses, balances and settle up)",
 		cart: "the Cart tab (shopping list with sales tax and budget)",
+		budget: "the Budget tab (monthly budgets, savings goals, spending insights, receipt scanning)",
 		sync: "the Sync tab (GitHub sync, encryption, backups, reminders and preferences)",
 		help: "the Help tab",
 		shared: "a read-only shared split link"
@@ -4662,6 +5322,804 @@ function focusHelpTarget(target) {
 	el.querySelector("summary, input, select")?.focus({ preventScroll: true });
 }
 //#endregion
+//#region src/lib/csv.ts
+/** RFC 4180-ish CSV parser: quoted fields, escaped quotes, CRLF, BOM. */
+function parseCSV(text) {
+	const rows = [];
+	let row = [];
+	let field = "";
+	let quoted = false;
+	const src = text.replace(/^﻿/, "");
+	for (let i = 0; i < src.length; i++) {
+		const ch = src[i];
+		if (quoted) {
+			if (ch === "\"") {
+				if (src[i + 1] === "\"") {
+					field += "\"";
+					i++;
+				} else quoted = false;
+			} else field += ch;
+		} else if (ch === "\"") quoted = true;
+		else if (ch === ",") {
+			row.push(field);
+			field = "";
+		} else if (ch === "\n" || ch === "\r") {
+			if (ch === "\r" && src[i + 1] === "\n") i++;
+			row.push(field);
+			rows.push(row);
+			row = [];
+			field = "";
+		} else field += ch;
+	}
+	if (field !== "" || row.length) {
+		row.push(field);
+		rows.push(row);
+	}
+	return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+/** Accepts 2026-09-23, 09/23/2026, 9/23/26 and 23.09.2026. */
+function parseLooseDate(s) {
+	const t = s.trim();
+	if (isISODate(t.slice(0, 10))) return t.slice(0, 10);
+	let m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(t);
+	if (m) {
+		const iso = `${m[3].length === 2 ? 2e3 + Number(m[3]) : Number(m[3])}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+		return isISODate(iso) ? iso : null;
+	}
+	m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(t);
+	if (m) {
+		const iso = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+		return isISODate(iso) ? iso : null;
+	}
+	return null;
+}
+var find = (header, ...patterns) => header.findIndex((h) => patterns.some((p) => p.test(h)));
+/**
+* Pull outgoing transactions from a bank/card export. Column names vary
+* wildly between banks, so we match on common header words and support both
+* a signed "Amount" column and separate "Debit"/"Credit" columns.
+*/
+function extractTransactions(rows, currency = "USD") {
+	if (rows.length < 2) return [];
+	const header = rows[0].map((h) => h.trim().toLowerCase());
+	const iDate = find(header, /^(transaction |posting |post )?date$/, /date/);
+	const iDesc = find(header, /desc/, /merchant/, /payee/, /name/, /memo/, /details/);
+	const iAmount = find(header, /^amount$/, /amount/);
+	const iDebit = find(header, /debit/, /withdraw/, /out/);
+	if (iDate < 0 || iDesc < 0 || iAmount < 0 && iDebit < 0) throw new Error("Could not find date, description and amount columns in this CSV.");
+	const raw = rows.slice(1).flatMap((r) => {
+		const date = parseLooseDate(r[iDate] ?? "");
+		const description = (r[iDesc] ?? "").trim();
+		if (!date || !description) return [];
+		if (iDebit >= 0 && (r[iDebit] ?? "").trim()) {
+			const v = parseMoney(r[iDebit], currency);
+			return v ? [{
+				date,
+				description,
+				signed: -Math.abs(v)
+			}] : [];
+		}
+		const v = iAmount >= 0 ? parseMoney(r[iAmount] ?? "", currency) : null;
+		return v ? [{
+			date,
+			description,
+			signed: v
+		}] : [];
+	});
+	const spendingIsNegative = raw.filter((t) => t.signed < 0).length >= raw.length / 2 || iDebit >= 0;
+	return raw.filter((t) => spendingIsNegative ? t.signed < 0 : t.signed > 0).map((t) => ({
+		date: t.date,
+		description: t.description,
+		amount: Math.abs(t.signed)
+	}));
+}
+/** "NETFLIX.COM 866-579-7172 CA #4412" → "Netflix.com" */
+function normalizeMerchant(desc) {
+	return desc.toUpperCase().replace(/^(POS|ACH|DEBIT|CHECKCARD|PURCHASE|RECURRING|SQ|TST|PP)\s*\*?\s*/g, "").replace(/\*.*$/, "").replace(/#\s*\d+/g, "").replace(/\b\d[\d\-\s]{3,}\b/g, "").replace(/\b(US|USA|CA|NY|TX|WA|INC|LLC|LTD|CO)\b\.?/g, "").replace(/[^A-Z0-9.&' ]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase().split(" ").slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+var TARGETS = [
+	[
+		"weekly",
+		7,
+		2
+	],
+	[
+		"monthly",
+		30.4,
+		4
+	],
+	[
+		"quarterly",
+		91.3,
+		8
+	],
+	[
+		"annual",
+		365.25,
+		15
+	]
+];
+var median = (xs) => {
+	const s = [...xs].sort((a, b) => a - b);
+	const m = s.length >> 1;
+	return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+/**
+* Find charges that repeat on a regular schedule with a stable price. Needs
+* at least 2 occurrences (3 for weekly, which is otherwise noisy).
+*/
+function detectRecurring(txns) {
+	const groups = /* @__PURE__ */ new Map();
+	for (const t of txns) {
+		const key = normalizeMerchant(t.description);
+		if (!key) continue;
+		groups.set(key, [...groups.get(key) ?? [], t]);
+	}
+	const out = [];
+	for (const [name, list] of groups) {
+		if (list.length < 2) continue;
+		const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+		const gaps = sorted.slice(1).map((t, i) => daysBetween(sorted[i].date, t.date));
+		const gap = median(gaps);
+		const match = TARGETS.find(([, days, tol]) => Math.abs(gap - days) <= tol);
+		if (!match) continue;
+		const [cycle, days, tol] = match;
+		if (cycle === "weekly" && sorted.length < 3) continue;
+		const spread = (xs) => {
+			const m = median(xs);
+			return Math.max(...xs.map((a) => Math.abs(a - m) / m));
+		};
+		const amounts = sorted.map((t) => t.amount);
+		let amountSpread = spread(amounts);
+		let previousAmount;
+		if (amountSpread > .15) {
+			const before = amounts.slice(0, -1);
+			if (before.length >= 2 && spread(before) <= .05) {
+				previousAmount = Math.round(median(before));
+				amountSpread = spread(before);
+			} else continue;
+		}
+		const timingSpread = Math.max(...gaps.map((g) => Math.abs(g - days))) / (tol * 2);
+		const confidence = Math.max(0, Math.min(1, .5 + .15 * (sorted.length - 2) - .3 * Math.min(1, timingSpread) - amountSpread));
+		const last = sorted.at(-1);
+		out.push({
+			name,
+			amount: last.amount,
+			cycle,
+			lastCharged: last.date,
+			nextExpected: nthOccurrence(last.date, cycle, 1),
+			occurrences: sorted.length,
+			confidence: Math.round(confidence * 100) / 100,
+			...previousAmount !== void 0 ? { previousAmount } : {}
+		});
+	}
+	return out.sort((a, b) => b.confidence - a.confidence || b.amount - a.amount);
+}
+//#endregion
+//#region src/lib/receipt.ts
+var PRICE_AT_END = /(-?)\s*[$£€]?\s*(\d{1,5}(?:[.,]\d{3})*[.,]\s?\d{2})\s*(-?)\s*(?:[A-Z*]{1,2})?\s*$/;
+var SUMMARY = [
+	[/sub\s*-?\s*total|net\s+sales|merchandise/i, "subtotal"],
+	[/\b(sales\s*)?tax\b|\bvat\b|\bgst\b|\bhst\b/i, "tax"],
+	[/\b(grand\s+)?total\b|amount\s+due|balance\s+due|\bto\s+pay\b/i, "total"],
+	[/change|cash|tender|visa|master\s*card|amex|debit|credit|card|payment|paid|balance|approved|auth|tip|gratuity|savings|you\s+saved|points|rewards|refund/i, "skip"]
+];
+var QTY_PREFIX = /^(\d{1,3})\s*[x@×]\s*/i;
+var QTY_AT = /(\d{1,3})\s*[@x×]\s*[$£€]?\s*\d+[.,]\d{2}/i;
+var JUNK = /^[\W\d_]*$/;
+function money(raw, currency) {
+	let s = raw.replace(/\s/g, "");
+	if (/,\d{2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+	else s = s.replace(/,/g, "");
+	return parseMoney(s, currency);
+}
+function cleanName(s) {
+	return s.replace(QTY_AT, "").replace(QTY_PREFIX, "").replace(/\b\d{6,}\b/g, "").replace(/[|_~=*]+/g, " ").replace(/\s{2,}/g, " ").replace(/^[\s.:-]+|[\s.:-]+$/g, "").trim();
+}
+function titleCase(s) {
+	if (s !== s.toUpperCase()) return s;
+	return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+}
+function parseReceipt(text, currency = "USD") {
+	const lines = text.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+	let merchant = null;
+	let date = null;
+	let subtotal = null;
+	let tax = null;
+	let total = null;
+	const items = [];
+	let pendingQty = null;
+	let pastTotal = false;
+	for (const line of lines) {
+		if (!date) {
+			const m = line.match(/\b(\d{1,4}[/.-]\d{1,2}[/.-]\d{2,4})\b/);
+			if (m) {
+				const d = parseLooseDate(m[1]) ?? parseLooseDate(m[1].replace(/-/g, "/"));
+				if (d) date = d;
+			}
+		}
+		const priceMatch = line.match(PRICE_AT_END);
+		if (!priceMatch) {
+			const q = line.match(/^(\d{1,3})\s*[@x×]\s*/i);
+			if (q) pendingQty = Number(q[1]);
+			else if (!merchant && items.length === 0 && /[a-z]{3}/i.test(line) && !/receipt|welcome|thank/i.test(line)) merchant = titleCase(cleanName(line));
+			continue;
+		}
+		const value = money(priceMatch[2], currency);
+		if (value === null) continue;
+		const negative = priceMatch[1] === "-" || priceMatch[3] === "-";
+		const label = line.slice(0, priceMatch.index).trim();
+		const qtyOnly = label.match(/^(\d{1,3})\s*[@x×]\s*[$£€]?$/i);
+		if (qtyOnly) {
+			pendingQty = Number(qtyOnly[1]);
+			continue;
+		}
+		const kind = SUMMARY.find(([re]) => re.test(label))?.[1];
+		if (kind === "subtotal") {
+			subtotal = value;
+			continue;
+		}
+		if (kind === "tax") {
+			tax = (tax ?? 0) + value;
+			continue;
+		}
+		if (kind === "total") {
+			if (total === null) total = value;
+			pastTotal = true;
+			continue;
+		}
+		if (kind === "skip" || pastTotal) continue;
+		const qtyAt = label.match(QTY_AT) ?? label.match(QTY_PREFIX);
+		const qty = qtyAt ? Number(qtyAt[1]) : pendingQty ?? 1;
+		pendingQty = null;
+		const name = titleCase(cleanName(label));
+		if (negative) {
+			const prev = items.at(-1);
+			if (prev) prev.amount = Math.max(0, prev.amount - value);
+			continue;
+		}
+		if (!name || JUNK.test(name)) continue;
+		items.push({
+			name,
+			amount: value,
+			qty: Math.max(1, qty)
+		});
+	}
+	const itemsSum = items.reduce((a, i) => a + i.amount, 0);
+	const expected = total ?? (subtotal !== null ? subtotal + (tax ?? 0) : null);
+	const balanced = expected !== null && Math.abs(itemsSum + (tax ?? 0) - expected) <= 2;
+	return {
+		merchant,
+		date,
+		items,
+		subtotal,
+		tax,
+		total,
+		itemsSum,
+		balanced
+	};
+}
+/** The best single figure for what was paid. */
+function receiptTotal(r) {
+	return r.total ?? (r.subtotal !== null ? r.subtotal + (r.tax ?? 0) : r.itemsSum + (r.tax ?? 0));
+}
+//#endregion
+//#region \0vite/preload-helper.js
+var scriptRel = /* @__PURE__ */ (function detectScriptRel() {
+	const relList = typeof document !== "undefined" && document.createElement("link").relList;
+	return relList && relList.supports && relList.supports("modulepreload") ? "modulepreload" : "preload";
+})();
+var assetsURL = function(dep, importerUrl) {
+	return new URL(dep, importerUrl).href;
+};
+var seen = {};
+var __vitePreload = function preload(baseModule, deps, importerUrl) {
+	let promise = Promise.resolve();
+	if (deps && deps.length > 0) {
+		const links = document.getElementsByTagName("link");
+		const cspNonceMeta = document.querySelector("meta[property=csp-nonce]");
+		const cspNonce = cspNonceMeta?.nonce || cspNonceMeta?.getAttribute("nonce");
+		function allSettled(promises) {
+			return Promise.all(promises.map((p) => Promise.resolve(p).then((value) => ({
+				status: "fulfilled",
+				value
+			}), (reason) => ({
+				status: "rejected",
+				reason
+			}))));
+		}
+		function importMetaResolve(specifier) {
+			if (import.meta.resolve) return import.meta.resolve(specifier);
+			return new URL(
+				specifier,
+				/** #__KEEP__ */
+				import.meta.url
+			).href;
+		}
+		promise = allSettled(deps.map((dep) => {
+			dep = assetsURL(dep, importerUrl);
+			dep = importMetaResolve(dep);
+			if (dep in seen) return;
+			seen[dep] = true;
+			const isCss = dep.endsWith(".css");
+			for (let i = links.length - 1; i >= 0; i--) {
+				const link = links[i];
+				if (link.href === dep && (!isCss || link.rel === "stylesheet")) return;
+			}
+			const link = document.createElement("link");
+			link.rel = isCss ? "stylesheet" : scriptRel;
+			if (!isCss) link.as = "script";
+			link.crossOrigin = "";
+			link.href = dep;
+			if (cspNonce) link.setAttribute("nonce", cspNonce);
+			document.head.appendChild(link);
+			if (isCss) return new Promise((res, rej) => {
+				link.addEventListener("load", res);
+				link.addEventListener("error", () => rej(/* @__PURE__ */ new Error(`Unable to preload CSS for ${dep}`)));
+			});
+		}).filter((p) => p !== void 0));
+	}
+	function handlePreloadError(err) {
+		const e = new Event("vite:preloadError", { cancelable: true });
+		e.payload = err;
+		window.dispatchEvent(e);
+		if (!e.defaultPrevented) throw err;
+	}
+	return promise.then((res) => {
+		for (const item of res || []) {
+			if (item.status !== "rejected") continue;
+			handlePreloadError(item.reason);
+		}
+		return baseModule().catch(handlePreloadError);
+	});
+};
+//#endregion
+//#region src/ui/ocr.ts
+/**
+* On-device text recognition for receipts, powered by Tesseract.js.
+*
+* The recognition engine (about 5 MB, once) is downloaded from the jsDelivr
+* CDN the first time someone scans a receipt, then cached by the browser and
+* the service worker. The photo itself is never uploaded: it is read in a
+* Web Worker on this device. Versions are pinned so the engine can't change
+* underneath the app.
+*/
+var CDN = "https://cdn.jsdelivr.net/npm/";
+var TESSERACT = "7.0.0";
+var OCR_URLS = {
+	module: `${CDN}tesseract.js@${TESSERACT}/dist/tesseract.esm.min.js`,
+	worker: `${CDN}tesseract.js@${TESSERACT}/dist/worker.min.js`,
+	core: `${CDN}tesseract.js-core@7.0.0`,
+	lang: `${CDN}@tesseract.js-data/eng/4.0.0_best_int`
+};
+var workerPromise = null;
+var onProgress = () => {};
+/** WebAssembly SIMD support (the same test wasm-feature-detect uses). */
+function hasSimd() {
+	try {
+		return WebAssembly.validate(new Uint8Array([
+			0,
+			97,
+			115,
+			109,
+			1,
+			0,
+			0,
+			0,
+			1,
+			5,
+			1,
+			96,
+			0,
+			1,
+			123,
+			3,
+			2,
+			1,
+			0,
+			10,
+			10,
+			1,
+			8,
+			0,
+			65,
+			0,
+			253,
+			15,
+			253,
+			98,
+			11
+		]));
+	} catch {
+		return false;
+	}
+}
+/**
+* Fetch a script from the page (so the service worker can cache it for
+* offline use) and hand it to the Web Worker as a blob URL. Scripts a worker
+* loads itself with importScripts() skip the service worker, which would
+* make scanning fail offline.
+*/
+async function scriptURL(url, suffix = "") {
+	const res = await fetch(url);
+	if (!res.ok) throw new Error(`Could not load ${url} (${res.status})`);
+	return URL.createObjectURL(new Blob([await res.blob()], { type: "text/javascript" })) + suffix;
+}
+function getWorker() {
+	workerPromise ??= (async () => {
+		onProgress({
+			stage: "Loading the reader (first time only)",
+			progress: null
+		});
+		const coreFile = `${OCR_URLS.core}/tesseract-core-${hasSimd() ? "simd-" : ""}lstm.wasm.js`;
+		const [mod, workerPath, corePath] = await Promise.all([
+			__vitePreload(() => import(
+				/* @vite-ignore */
+				OCR_URLS.module
+), [], import.meta.url),
+			scriptURL(OCR_URLS.worker),
+			scriptURL(coreFile, "#.js")
+		]);
+		const worker = await (typeof mod.createWorker === "function" ? mod : mod.default).createWorker("eng", 1, {
+			workerPath,
+			workerBlobURL: false,
+			corePath,
+			langPath: OCR_URLS.lang,
+			logger: (m) => {
+				const reading = m.status === "recognizing text";
+				onProgress({
+					stage: reading ? "Reading the receipt" : "Loading the reader (first time only)",
+					progress: reading || m.progress > 0 ? m.progress : null
+				});
+			}
+		});
+		await worker.setParameters({
+			tessedit_pageseg_mode: "6",
+			preserve_interword_spaces: "1"
+		});
+		return worker;
+	})();
+	workerPromise.catch(() => {
+		workerPromise = null;
+	});
+	return workerPromise;
+}
+/**
+* Shrink big phone photos and boost contrast. Recognition is faster and
+* noticeably more accurate on a grey, evenly lit image around 1600px tall.
+*/
+async function prepareImage(file) {
+	const bitmap = await createImageBitmap(file);
+	const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+	const w = Math.round(bitmap.width * scale);
+	const h = Math.round(bitmap.height * scale);
+	const canvas = document.createElement("canvas");
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext("2d", { willReadFrequently: true });
+	ctx.drawImage(bitmap, 0, 0, w, h);
+	bitmap.close?.();
+	const img = ctx.getImageData(0, 0, w, h);
+	const d = img.data;
+	const hist = /* @__PURE__ */ new Uint32Array(256);
+	for (let i = 0; i < d.length; i += 4) {
+		const g = Math.round(.299 * d[i] + .587 * d[i + 1] + .114 * d[i + 2]);
+		d[i] = g;
+		hist[g]++;
+	}
+	const total = w * h;
+	let lo = 0, hi = 255, acc = 0;
+	for (let v = 0; v < 256; v++) {
+		acc += hist[v];
+		if (acc >= total * .02) {
+			lo = v;
+			break;
+		}
+	}
+	acc = 0;
+	for (let v = 255; v >= 0; v--) {
+		acc += hist[v];
+		if (acc >= total * .02) {
+			hi = v;
+			break;
+		}
+	}
+	const range = Math.max(1, hi - lo);
+	for (let i = 0; i < d.length; i += 4) {
+		const g = Math.max(0, Math.min(255, (d[i] - lo) * 255 / range));
+		d[i] = d[i + 1] = d[i + 2] = g;
+	}
+	ctx.putImageData(img, 0, 0);
+	return canvas;
+}
+/** Read the text on a receipt photo, entirely on this device. */
+async function readReceiptImage(file, progress) {
+	onProgress = progress;
+	const [worker, image] = await Promise.all([getWorker(), prepareImage(file)]);
+	progress({
+		stage: "Reading the receipt",
+		progress: 0
+	});
+	const { data } = await worker.recognize(image);
+	return data.text;
+}
+//#endregion
+//#region src/views/receipt.ts
+/**
+* Scan a receipt photo (read on this device) or paste its text, check the
+* lines, then log it as spending, add it to the cart, or split it with the
+* group. Nothing is saved until the person reviews it.
+*/
+function scanReceipt(ctx, initial = "spend") {
+	const cur = ctx.state.settings.currency;
+	const members = ctx.state.split.members;
+	let target = initial === "split" && !members.length ? "spend" : initial;
+	let receipt = null;
+	let rows = [];
+	let merchant = "";
+	let date = ctx.today;
+	let tax = 0;
+	let category = "Groceries";
+	let paidBy = members[0]?.id ?? "";
+	let busy = false;
+	const pick = h("div", { class: "scan-pick" });
+	const status = h("div", {
+		class: "scan-status",
+		role: "status",
+		"aria-live": "polite"
+	});
+	const review = h("div", { class: "scan-review" });
+	const fileInput = h("input", {
+		type: "file",
+		accept: "image/*",
+		capture: "environment",
+		class: "sr-only",
+		id: "receipt-photo",
+		onChange: (e) => {
+			const f = e.target.files?.[0];
+			if (f) readPhoto(f);
+		}
+	});
+	const pasted = h("textarea", {
+		rows: 4,
+		placeholder: "GREEN VALLEY MARKET\nMILK 1GAL     4.29\nBANANAS       1.47\nTOTAL         5.76",
+		"aria-label": "Receipt text",
+		class: "mono"
+	});
+	pick.append(h("label", {
+		class: "dropzone scan-drop",
+		htmlFor: "receipt-photo"
+	}, icon("scan-line", 24), h("span", { class: "strong" }, "Take a photo or choose one"), h("span", { class: "muted" }, "Read on this device. The photo is never uploaded or saved."), fileInput), h("details", { class: "scan-paste" }, h("summary", null, "Or paste the receipt’s text"), pasted, button("Read text", () => {
+		if (!pasted.value.trim()) return toast("Paste the text from a receipt first.");
+		load(pasted.value);
+	}, {
+		small: true,
+		icon: "file-text"
+	})));
+	async function readPhoto(file) {
+		if (busy) return;
+		busy = true;
+		const bar = h("progress", { max: 1 });
+		const label = h("span", null, "Starting…");
+		status.replaceChildren(h("div", { class: "scan-progress" }, label, bar));
+		try {
+			const text = await readReceiptImage(file, ({ stage, progress }) => {
+				label.textContent = stage;
+				if (progress === null) bar.removeAttribute("value");
+				else bar.value = progress;
+			});
+			status.replaceChildren();
+			load(text);
+		} catch (e) {
+			console.warn(e);
+			status.replaceChildren(h("p", { class: "form-error" }, navigator.onLine ? "Couldn’t read that photo. Try a sharper, flatter photo in good light, or paste the text instead." : "The receipt reader needs to download once (about 5 MB) and you’re offline. Connect and try again, or paste the text instead."));
+		} finally {
+			busy = false;
+			fileInput.value = "";
+		}
+	}
+	function load(text) {
+		receipt = parseReceipt(text, cur);
+		rows = receipt.items.map((i) => ({
+			include: true,
+			name: i.name,
+			amount: i.amount,
+			qty: i.qty
+		}));
+		merchant = receipt.merchant ?? "";
+		date = receipt.date && receipt.date <= ctx.today ? receipt.date : ctx.today;
+		tax = receipt.tax ?? 0;
+		const guess = merchant ? categorize(merchant) : "Other";
+		category = guess === "Other" ? "Groceries" : guess;
+		if (!rows.length && receipt.total === null) {
+			status.replaceChildren(h("p", { class: "form-error" }, "No prices found. Check the photo is the right way up and the prices are in focus, or add the lines yourself below."));
+			rows = [{
+				include: true,
+				name: "",
+				amount: 0,
+				qty: 1
+			}];
+		}
+		pick.hidden = true;
+		renderReview();
+	}
+	const itemsSum = () => rows.filter((r) => r.include).reduce((a, r) => a + r.amount, 0);
+	const total = () => receipt && receipt.total !== null && rows.every((r) => r.include) && Math.abs(itemsSum() + tax - receipt.total) <= 2 ? receipt.total : itemsSum() + tax;
+	function renderReview() {
+		if (!receipt) return;
+		const printed = receipt.total ?? (receipt.subtotal !== null ? receiptTotal(receipt) : null);
+		const diff = printed !== null ? printed - (itemsSum() + tax) : 0;
+		const allIn = rows.every((r) => r.include);
+		const moneyIn = (value, label, set, key) => h("input", {
+			inputMode: "decimal",
+			class: "num",
+			value: toInputValue(value, cur),
+			"aria-label": label,
+			size: 7,
+			dataset: { key },
+			onChange: (e) => {
+				const v = parseMoney(e.target.value, cur);
+				if (v === null || v < 0) return toast("Enter an amount like 4.29");
+				set(v);
+				renderReview();
+			}
+		});
+		review.replaceChildren(h("div", { class: "grid-2" }, field("Store", h("input", {
+			value: merchant,
+			onInput: (e) => {
+				merchant = e.target.value;
+			}
+		})), field("Date", h("input", {
+			type: "date",
+			value: date,
+			max: ctx.today,
+			onChange: (e) => {
+				const v = e.target.value;
+				if (isISODate(v)) date = v;
+			}
+		}))), h("table", { class: "table scan-items" }, h("caption", { class: "sr-only" }, "Lines read from the receipt"), h("thead", null, h("tr", null, h("th", null, h("span", { class: "sr-only" }, "Include")), h("th", null, "Item"), h("th", { class: "r" }, "Qty"), h("th", { class: "r" }, "Amount"), h("th", null, h("span", { class: "sr-only" }, "Remove")))), h("tbody", null, rows.map((r, i) => h("tr", { class: r.include ? "" : "is-paused" }, h("td", null, h("input", {
+			type: "checkbox",
+			checked: r.include,
+			"aria-label": `Include ${r.name || "this line"}`,
+			onChange: () => {
+				r.include = !r.include;
+				renderReview();
+			}
+		})), h("td", null, h("input", {
+			value: r.name,
+			"aria-label": `Item ${i + 1} name`,
+			onInput: (e) => {
+				r.name = e.target.value;
+			}
+		})), h("td", { class: "r" }, h("input", {
+			type: "number",
+			min: 1,
+			value: r.qty,
+			class: "num qty-in",
+			"aria-label": `Item ${i + 1} quantity`,
+			onChange: (e) => {
+				r.qty = Math.max(1, Math.floor(Number(e.target.value) || 1));
+			}
+		})), h("td", { class: "r" }, moneyIn(r.amount, `Item ${i + 1} amount`, (v) => {
+			r.amount = v;
+		}, `scan-amt-${i}`)), h("td", null, button("", () => {
+			rows.splice(i, 1);
+			renderReview();
+		}, {
+			icon: "x",
+			title: `Remove ${r.name || "line"}`,
+			variant: "quiet",
+			small: true
+		})))))), h("div", { class: "row" }, button("Add a line", () => {
+			rows.push({
+				include: true,
+				name: "",
+				amount: 0,
+				qty: 1
+			});
+			renderReview();
+		}, {
+			icon: "plus",
+			small: true,
+			variant: "quiet"
+		}), h("span", { class: "spacer" }), h("label", { class: "inline-field" }, "Tax", moneyIn(tax, "Tax", (v) => {
+			tax = v;
+		}, "scan-tax"))), h("dl", { class: "receipt scan-sum" }, h("dt", null, "Items"), h("dd", { class: "num" }, ctx.money(itemsSum())), h("dt", null, "Tax"), h("dd", { class: "num" }, ctx.money(tax)), h("dt", { class: "strong" }, "Total"), h("dd", { class: "num strong" }, ctx.money(total()))), printed !== null && allIn ? Math.abs(diff) <= 2 ? h("p", { class: "scan-check ok" }, icon("circle-check", 16), ` Matches the printed total of ${ctx.money(printed)}.`) : h("p", { class: "scan-check warn" }, icon("triangle-alert", 16), ` The printed total is ${ctx.money(printed)}, ${ctx.money(Math.abs(diff))} ${diff > 0 ? "more" : "less"} than these lines. A line may have been misread; check the amounts.`) : "", h("fieldset", { class: "scan-target" }, h("legend", null, "What should Tally do with it?"), segmented("Save to", [
+			{
+				value: "spend",
+				label: "Log spending",
+				icon: "wallet"
+			},
+			{
+				value: "cart",
+				label: "Add to cart",
+				icon: "shopping-cart"
+			},
+			...members.length ? [{
+				value: "split",
+				label: "Split it",
+				icon: "users"
+			}] : []
+		], target, (v) => {
+			target = v;
+			renderReview();
+		}), target === "spend" ? field("Category", h("select", { onChange: (e) => {
+			category = e.target.value;
+		} }, SPEND_CATEGORIES.map((c) => h("option", {
+			value: c,
+			selected: c === category
+		}, c))), "Counts toward that budget this month.") : target === "split" ? field("Paid by", h("select", { onChange: (e) => {
+			paidBy = e.target.value;
+		} }, members.map((m) => h("option", {
+			value: m.id,
+			selected: m.id === paidBy
+		}, m.name))), `Split equally between all ${members.length}. You can change the split afterwards.`) : h("p", { class: "hint" }, "Adds the checked lines to your cart list.")));
+	}
+	openDialog({
+		title: "Scan a receipt",
+		body: () => h("div", { class: "scan" }, pick, status, review),
+		submitLabel: "Save",
+		onSubmit: () => {
+			if (!receipt) return "Take a photo of a receipt, or paste its text, first.";
+			const lines = rows.filter((r) => r.include && r.amount > 0);
+			const amount = total();
+			if (amount <= 0) return "There’s nothing to save yet. Check at least one line has an amount.";
+			const note = merchant.trim() || "Receipt";
+			if (target === "spend") {
+				store.update(`Log ${note}`, (d) => {
+					d.budget.spending.push({
+						id: uid(),
+						date,
+						amount,
+						category,
+						note,
+						source: "receipt"
+					});
+				});
+				toast(`Logged ${ctx.money(amount)} under ${category}`, {
+					label: "Undo",
+					run: () => store.undo()
+				});
+			} else if (target === "cart") {
+				if (!lines.length) return "Check at least one line to add to the cart.";
+				store.update(`Add ${lines.length} items from receipt`, (d) => {
+					for (const r of lines) d.cart.items.push({
+						id: uid(),
+						name: r.name.trim() || "Item",
+						unitPrice: Math.round(r.amount / r.qty),
+						qty: r.qty,
+						taxable: tax > 0,
+						inBasket: false
+					});
+				});
+				toast(`Added ${lines.length} items to the cart`, {
+					label: "Undo",
+					run: () => store.undo()
+				});
+			} else {
+				if (!paidBy) return "Choose who paid.";
+				store.update(`Split ${note}`, (d) => {
+					d.split.expenses.push({
+						id: uid(),
+						description: note,
+						date,
+						paidBy,
+						amount,
+						split: {
+							kind: "equal",
+							among: d.split.members.map((m) => m.id)
+						}
+					});
+				});
+				toast(`Added ${note} to the split`, {
+					label: "Undo",
+					run: () => store.undo()
+				});
+			}
+		}
+	});
+}
+//#endregion
 //#region src/views/cart.ts
 function cartView(ctx) {
 	const { state, money } = ctx;
@@ -4682,7 +6140,11 @@ function cartView(ctx) {
 	}, h("div", { class: "toolbar" }, h("h2", {
 		id: "cart-title",
 		class: "section-title"
-	}, "Cart"), h("p", { class: "muted" }, "Know the real total, tax included, before you reach the register.")), h("div", { class: [
+	}, "Cart"), h("p", { class: "muted" }, "Know the real total, tax included, before you reach the register."), h("span", { class: "spacer" }), button("Scan a receipt", () => scanReceipt(ctx, "cart"), {
+		icon: "scan-line",
+		small: true,
+		key: "cart-scan"
+	})), h("div", { class: [
 		"card",
 		"budget",
 		`lvl-${b.level}`
@@ -4777,7 +6239,13 @@ function cartView(ctx) {
 		title: `Remove ${it.name}`,
 		variant: "quiet",
 		small: true
-	})))) : empty("Your cart is empty", "Add what you plan to buy. Tick items off as they go in the basket."), items.length ? h("div", { class: "row end" }, button("Clear cart", () => {
+	})))) : empty("Your cart is empty", "Add what you plan to buy. Tick items off as they go in the basket."), items.length ? h("div", { class: "row end" }, t.basketTotal > 0 ? button(`Paid ${money(basketPaid())}? Log it`, () => checkout(), {
+		variant: "primary",
+		small: true,
+		icon: "wallet",
+		key: "cart-checkout",
+		title: "Log what’s in the basket as Groceries spending and clear it from the list"
+	}) : "", button("Clear cart", () => {
 		store.update("Clear cart", (d) => {
 			d.cart.items = [];
 		});
@@ -4790,6 +6258,29 @@ function cartView(ctx) {
 		small: true,
 		icon: "trash"
 	})) : null));
+	/** Basket items plus their share of tax: what you actually paid. */
+	function basketPaid() {
+		return cartTotals(items.filter((i) => i.inBasket), taxRateBps).total;
+	}
+	function checkout() {
+		const amount = basketPaid();
+		const n = items.filter((i) => i.inBasket).length;
+		store.update("Check out", (d) => {
+			d.budget.spending.push({
+				id: uid(),
+				date: ctx.today,
+				amount,
+				category: "Groceries",
+				note: `Cart: ${n} ${n === 1 ? "item" : "items"}`,
+				source: "cart"
+			});
+			d.cart.items = d.cart.items.filter((i) => !i.inBasket);
+		});
+		toast(`Logged ${money(amount)} under Groceries on your Budget`, {
+			label: "Undo",
+			run: () => store.undo()
+		}, 7e3);
+	}
 	function remove(id, name) {
 		store.update(`Remove ${name}`, (d) => {
 			d.cart.items = d.cart.items.filter((x) => x.id !== id);
@@ -5001,7 +6492,10 @@ function splitView(ctx) {
 	}, CURRENCIES.map((c) => h("option", {
 		value: c,
 		selected: c === currency
-	}, c)))), button("Log expense", () => editExpense(ctx), {
+	}, c)))), members.length ? button("Scan a receipt", () => scanReceipt(ctx, "split"), {
+		icon: "scan-line",
+		key: "split-scan"
+	}) : null, button("Log expense", () => editExpense(ctx), {
 		variant: "primary",
 		icon: "plus",
 		key: "add-exp"
@@ -5422,180 +6916,6 @@ async function shareLink(ctx) {
 		location.hash = `/shared/${token}`;
 		toast("Copy the address from your browser bar to share this view.", void 0, 8e3);
 	}
-}
-//#endregion
-//#region src/lib/csv.ts
-/** RFC 4180-ish CSV parser: quoted fields, escaped quotes, CRLF, BOM. */
-function parseCSV(text) {
-	const rows = [];
-	let row = [];
-	let field = "";
-	let quoted = false;
-	const src = text.replace(/^﻿/, "");
-	for (let i = 0; i < src.length; i++) {
-		const ch = src[i];
-		if (quoted) {
-			if (ch === "\"") {
-				if (src[i + 1] === "\"") {
-					field += "\"";
-					i++;
-				} else quoted = false;
-			} else field += ch;
-		} else if (ch === "\"") quoted = true;
-		else if (ch === ",") {
-			row.push(field);
-			field = "";
-		} else if (ch === "\n" || ch === "\r") {
-			if (ch === "\r" && src[i + 1] === "\n") i++;
-			row.push(field);
-			rows.push(row);
-			row = [];
-			field = "";
-		} else field += ch;
-	}
-	if (field !== "" || row.length) {
-		row.push(field);
-		rows.push(row);
-	}
-	return rows.filter((r) => r.some((c) => c.trim() !== ""));
-}
-/** Accepts 2026-09-23, 09/23/2026, 9/23/26 and 23.09.2026. */
-function parseLooseDate(s) {
-	const t = s.trim();
-	if (isISODate(t.slice(0, 10))) return t.slice(0, 10);
-	let m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(t);
-	if (m) {
-		const iso = `${m[3].length === 2 ? 2e3 + Number(m[3]) : Number(m[3])}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
-		return isISODate(iso) ? iso : null;
-	}
-	m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(t);
-	if (m) {
-		const iso = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-		return isISODate(iso) ? iso : null;
-	}
-	return null;
-}
-var find = (header, ...patterns) => header.findIndex((h) => patterns.some((p) => p.test(h)));
-/**
-* Pull outgoing transactions from a bank/card export. Column names vary
-* wildly between banks, so we match on common header words and support both
-* a signed "Amount" column and separate "Debit"/"Credit" columns.
-*/
-function extractTransactions(rows, currency = "USD") {
-	if (rows.length < 2) return [];
-	const header = rows[0].map((h) => h.trim().toLowerCase());
-	const iDate = find(header, /^(transaction |posting |post )?date$/, /date/);
-	const iDesc = find(header, /desc/, /merchant/, /payee/, /name/, /memo/, /details/);
-	const iAmount = find(header, /^amount$/, /amount/);
-	const iDebit = find(header, /debit/, /withdraw/, /out/);
-	if (iDate < 0 || iDesc < 0 || iAmount < 0 && iDebit < 0) throw new Error("Could not find date, description and amount columns in this CSV.");
-	const raw = rows.slice(1).flatMap((r) => {
-		const date = parseLooseDate(r[iDate] ?? "");
-		const description = (r[iDesc] ?? "").trim();
-		if (!date || !description) return [];
-		if (iDebit >= 0 && (r[iDebit] ?? "").trim()) {
-			const v = parseMoney(r[iDebit], currency);
-			return v ? [{
-				date,
-				description,
-				signed: -Math.abs(v)
-			}] : [];
-		}
-		const v = iAmount >= 0 ? parseMoney(r[iAmount] ?? "", currency) : null;
-		return v ? [{
-			date,
-			description,
-			signed: v
-		}] : [];
-	});
-	const spendingIsNegative = raw.filter((t) => t.signed < 0).length >= raw.length / 2 || iDebit >= 0;
-	return raw.filter((t) => spendingIsNegative ? t.signed < 0 : t.signed > 0).map((t) => ({
-		date: t.date,
-		description: t.description,
-		amount: Math.abs(t.signed)
-	}));
-}
-/** "NETFLIX.COM 866-579-7172 CA #4412" → "Netflix.com" */
-function normalizeMerchant(desc) {
-	return desc.toUpperCase().replace(/^(POS|ACH|DEBIT|CHECKCARD|PURCHASE|RECURRING|SQ|TST|PP)\s*\*?\s*/g, "").replace(/\*.*$/, "").replace(/#\s*\d+/g, "").replace(/\b\d[\d\-\s]{3,}\b/g, "").replace(/\b(US|USA|CA|NY|TX|WA|INC|LLC|LTD|CO)\b\.?/g, "").replace(/[^A-Z0-9.&' ]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase().split(" ").slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
-var TARGETS = [
-	[
-		"weekly",
-		7,
-		2
-	],
-	[
-		"monthly",
-		30.4,
-		4
-	],
-	[
-		"quarterly",
-		91.3,
-		8
-	],
-	[
-		"annual",
-		365.25,
-		15
-	]
-];
-var median = (xs) => {
-	const s = [...xs].sort((a, b) => a - b);
-	const m = s.length >> 1;
-	return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
-/**
-* Find charges that repeat on a regular schedule with a stable price. Needs
-* at least 2 occurrences (3 for weekly, which is otherwise noisy).
-*/
-function detectRecurring(txns) {
-	const groups = /* @__PURE__ */ new Map();
-	for (const t of txns) {
-		const key = normalizeMerchant(t.description);
-		if (!key) continue;
-		groups.set(key, [...groups.get(key) ?? [], t]);
-	}
-	const out = [];
-	for (const [name, list] of groups) {
-		if (list.length < 2) continue;
-		const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
-		const gaps = sorted.slice(1).map((t, i) => daysBetween(sorted[i].date, t.date));
-		const gap = median(gaps);
-		const match = TARGETS.find(([, days, tol]) => Math.abs(gap - days) <= tol);
-		if (!match) continue;
-		const [cycle, days, tol] = match;
-		if (cycle === "weekly" && sorted.length < 3) continue;
-		const spread = (xs) => {
-			const m = median(xs);
-			return Math.max(...xs.map((a) => Math.abs(a - m) / m));
-		};
-		const amounts = sorted.map((t) => t.amount);
-		let amountSpread = spread(amounts);
-		let previousAmount;
-		if (amountSpread > .15) {
-			const before = amounts.slice(0, -1);
-			if (before.length >= 2 && spread(before) <= .05) {
-				previousAmount = Math.round(median(before));
-				amountSpread = spread(before);
-			} else continue;
-		}
-		const timingSpread = Math.max(...gaps.map((g) => Math.abs(g - days))) / (tol * 2);
-		const confidence = Math.max(0, Math.min(1, .5 + .15 * (sorted.length - 2) - .3 * Math.min(1, timingSpread) - amountSpread));
-		const last = sorted.at(-1);
-		out.push({
-			name,
-			amount: last.amount,
-			cycle,
-			lastCharged: last.date,
-			nextExpected: nthOccurrence(last.date, cycle, 1),
-			occurrences: sorted.length,
-			confidence: Math.round(confidence * 100) / 100,
-			...previousAmount !== void 0 ? { previousAmount } : {}
-		});
-	}
-	return out.sort((a, b) => b.confidence - a.confidence || b.amount - a.amount);
 }
 //#endregion
 //#region src/lib/ics.ts
@@ -6879,11 +8199,566 @@ function content(ctx, data) {
 	];
 }
 //#endregion
+//#region src/views/budget.ts
+/** Month being viewed; null follows today. */
+var viewMonth = null;
+var showAllSpending = false;
+var SOURCE = {
+	manual: {
+		icon: "pencil",
+		label: "Logged by hand"
+	},
+	receipt: {
+		icon: "receipt",
+		label: "Scanned receipt"
+	},
+	bank: {
+		icon: "file-spreadsheet",
+		label: "Bank import"
+	},
+	cart: {
+		icon: "shopping-cart",
+		label: "From the cart"
+	}
+};
+var LEVEL = {
+	ok: {
+		icon: "circle-check",
+		label: "On track"
+	},
+	warn: {
+		icon: "triangle-alert",
+		label: "Watch it"
+	},
+	over: {
+		icon: "triangle-alert",
+		label: "Over"
+	}
+};
+function budgetView(ctx) {
+	const { state, money, today } = ctx;
+	const b = state.budget;
+	const subs = state.subscriptions;
+	const current = monthOf(today);
+	const month = viewMonth ?? current;
+	const isCurrent = month === current;
+	const through = isCurrent ? today : void 0;
+	const monthName = (m, year = true) => formatDate(`${m}-01`, void 0, {
+		month: "long",
+		year: year ? "numeric" : void 0,
+		day: void 0
+	});
+	const setMonth = (m) => {
+		viewMonth = m === current ? null : m;
+		showAllSpending = false;
+		ctx.rerender();
+	};
+	const spent = monthTotal(b.spending, subs, month, through);
+	const prevSpent = monthTotal(b.spending, subs, shiftMonth(month, -1));
+	const budgets = allBudgets(b, subs, month, today);
+	const budgetTotal = budgets.reduce((a, x) => a + x.limit, 0);
+	const onTrack = budgets.filter((x) => x.level === "ok").length;
+	return h("section", {
+		class: "view",
+		"aria-labelledby": "budget-title"
+	}, h("div", { class: "toolbar" }, h("h2", {
+		id: "budget-title",
+		class: "section-title"
+	}, "Budget"), h("p", { class: "muted" }, "Where your money goes each month, and what you’re saving toward."), h("span", { class: "spacer" }), h("div", { class: "row wrap bud-actions" }, button("Scan a receipt", () => scanReceipt(ctx, "spend"), {
+		icon: "scan-line",
+		key: "scan-receipt"
+	}), button("Import bank CSV", () => pickCSV(ctx), {
+		icon: "file-spreadsheet",
+		key: "import-spend"
+	}), button("Log spending", () => editSpend(ctx), {
+		variant: "primary",
+		icon: "plus",
+		key: "log-spend"
+	}))), h("div", { class: "card bud-summary" }, h("div", { class: "bud-month" }, button("", () => setMonth(shiftMonth(month, -1)), {
+		icon: "chevron-left",
+		title: "Previous month",
+		variant: "quiet",
+		key: "bud-prev"
+	}), h("h3", { "aria-live": "polite" }, monthName(month)), button("", () => setMonth(shiftMonth(month, 1)), {
+		icon: "chevron-right",
+		title: "Next month",
+		variant: "quiet",
+		key: "bud-next"
+	}), isCurrent ? null : button("This month", () => setMonth(current), {
+		small: true,
+		variant: "quiet"
+	})), h("div", { class: "bud-figures" }, h("div", null, h("p", { class: "eyebrow" }, isCurrent ? "Spent so far" : "Spent"), h("p", { class: "figure" }, money(spent)), prevSpent > 0 ? h("p", { class: "hint" }, `${monthName(shiftMonth(month, -1), false)}: ${money(prevSpent)}`) : null), budgetTotal ? h("div", null, h("p", { class: "eyebrow" }, "Budgeted"), h("p", { class: "figure sm" }, money(budgetTotal)), h("p", { class: "hint" }, `${onTrack} of ${budgets.length} on track`)) : null, b.goals.length ? h("div", null, h("p", { class: "eyebrow" }, "Saved toward goals"), h("p", { class: "figure sm" }, money(b.goals.reduce((a, g) => a + g.saved, 0))), h("p", { class: "hint" }, `of ${money(b.goals.reduce((a, g) => a + g.target, 0))}`)) : null)), h("div", { class: "split-grid bud-grid" }, h("div", { class: "bud-col" }, budgetsCard(ctx, month, budgets), goalsCard(ctx)), h("div", { class: "bud-col" }, insightsCard(ctx, month, through), spendingCard(ctx, month))));
+}
+function budgetsCard(ctx, month, budgets) {
+	const { money } = ctx;
+	const isCurrent = month === monthOf(ctx.today);
+	return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Monthly budgets ", helpTip("budget-pace")), button(budgets.length ? "Edit budgets" : "Set budgets", () => editBudgets(ctx), {
+		small: true,
+		icon: "pencil",
+		key: "edit-budgets"
+	})), budgets.length ? h("ul", { class: "bud-list" }, budgets.map((x) => {
+		const pct = Math.min(100, x.pct * 100);
+		const pace = x.limit > 0 ? Math.min(100, x.projected / x.limit * 100) : 0;
+		const lvl = LEVEL[x.level];
+		const msg = x.level === "over" ? `${money(-x.remaining)} over` : `${money(x.remaining)} left`;
+		return h("li", { class: `lvl-${x.level}` }, h("div", { class: "bud-row" }, h("span", { class: "strong" }, x.category), h("span", { class: "bud-level" }, icon(lvl.icon, 14), lvl.label), h("span", { class: "spacer" }), h("span", { class: "num" }, money(x.spent), h("span", { class: "muted" }, ` / ${money(x.limit)}`))), h("div", {
+			class: "bud-bar",
+			role: "meter",
+			"aria-valuemin": "0",
+			"aria-valuemax": String(x.limit),
+			"aria-valuenow": String(Math.min(x.spent, x.limit)),
+			"aria-label": `${x.category}: ${money(x.spent)} of ${money(x.limit)}`
+		}, h("span", {
+			class: "bud-fill",
+			style: { width: `${pct}%` }
+		}), isCurrent && x.projected > x.spent && x.category !== "Subscriptions" ? h("span", {
+			class: "bud-pace",
+			style: { left: `${pace}%` },
+			title: `On pace for ${money(x.projected)}`
+		}) : null), h("p", { class: "hint" }, msg, isCurrent && x.projected > x.limit && x.level !== "over" ? ` · on pace for ${money(x.projected)}` : x.category === "Subscriptions" && isCurrent && x.projected > x.spent ? ` · ${money(x.projected - x.spent)} more due this month` : null));
+	})) : empty("No budgets yet", "Set a monthly limit for the categories you want to keep an eye on. Tally suggests amounts from your recent spending.", button("Set budgets", () => editBudgets(ctx), {
+		variant: "primary",
+		small: true
+	})));
+}
+function editBudgets(ctx) {
+	const { state } = ctx;
+	const cur = state.settings.currency;
+	const months = lastMonths(shiftMonth(monthOf(ctx.today), -1), 3);
+	const avg = (cat) => {
+		const total = months.reduce((a, m) => a + (spentByCategory(state.budget.spending, state.subscriptions, m).find((c) => c.category === cat)?.amount ?? 0), 0);
+		return Math.round(total / months.length);
+	};
+	openDialog({
+		title: "Monthly budgets",
+		submitLabel: "Save budgets",
+		body: () => h("div", null, h("p", { class: "hint" }, "Leave a category blank to not budget it. The grey amount is your average over the last three months."), h("div", { class: "grid-form bud-form" }, BUDGET_CATEGORIES.map((cat) => {
+			const a = avg(cat);
+			return field(cat, h("input", {
+				name: cat,
+				inputMode: "decimal",
+				class: "num",
+				value: state.budget.limits[cat] ? toInputValue(state.budget.limits[cat], cur) : "",
+				placeholder: a > 0 ? toInputValue(Math.ceil(a / 1e3) * 1e3, cur) : ""
+			}), cat === "Subscriptions" ? "Your subscription charges count here automatically." : void 0);
+		}))),
+		onSubmit: (data) => {
+			const limits = {};
+			for (const cat of BUDGET_CATEGORIES) {
+				const raw = String(data.get(cat) ?? "").trim();
+				if (!raw) continue;
+				const v = parseMoney(raw, cur);
+				if (v === null || v < 0) return `Enter an amount for ${cat}, like 250, or leave it blank.`;
+				if (v > 0) limits[cat] = v;
+			}
+			store.update("Change budgets", (d) => {
+				d.budget.limits = limits;
+			});
+			toast("Budgets saved");
+		}
+	});
+}
+function goalsCard(ctx) {
+	const { money, state } = ctx;
+	const goals = state.budget.goals;
+	return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Savings goals"), button("New goal", () => editGoal(ctx), {
+		small: true,
+		icon: "plus",
+		key: "new-goal"
+	})), goals.length ? h("ul", { class: "goal-list" }, goals.map((g) => {
+		const p = goalProgress(g, ctx.today);
+		const line = p.done ? "Reached. Nice work." : p.overdue ? `The date has passed with ${money(p.remaining)} to go. Pick a new date to get a fresh plan.` : p.perMonth !== null ? `Put aside ${money(p.perMonth)} a month to reach it by ${formatDate(g.by, void 0, { year: "numeric" })}.` : `${money(p.remaining)} to go. Add a date to get a monthly amount.`;
+		return h("li", { class: p.done ? "done" : "" }, h("div", { class: "bud-row" }, h("span", { class: "strong" }, g.name), p.done ? h("span", { class: "bud-level ok" }, icon("circle-check", 14), "Done") : null, h("span", { class: "spacer" }), h("span", { class: "num" }, money(g.saved), h("span", { class: "muted" }, ` / ${money(g.target)}`))), h("div", {
+			class: "bud-bar goal",
+			role: "progressbar",
+			"aria-valuemin": "0",
+			"aria-valuemax": "100",
+			"aria-valuenow": String(Math.round(p.pct * 100)),
+			"aria-label": `${g.name}: ${Math.round(p.pct * 100)}% saved`
+		}, h("span", {
+			class: "bud-fill",
+			style: { width: `${p.pct * 100}%` }
+		})), h("div", { class: "goal-foot" }, h("p", { class: "hint" }, line), h("span", { class: "spacer" }), p.done ? null : button("Add money", () => addToGoal(ctx, g), {
+			small: true,
+			icon: "piggy-bank",
+			key: `goal-add-${g.id}`
+		}), button("", () => editGoal(ctx, g), {
+			icon: "pencil",
+			title: `Edit ${g.name}`,
+			variant: "quiet",
+			small: true,
+			key: `goal-edit-${g.id}`
+		})));
+	})) : empty("No goals yet", "An emergency fund, a trip, a new laptop: set a target and a date, and Tally works out how much to put aside each month.", button("New goal", () => editGoal(ctx), {
+		variant: "primary",
+		small: true
+	})));
+}
+function editGoal(ctx, existing) {
+	const cur = ctx.state.settings.currency;
+	openDialog({
+		title: existing ? `Edit ${existing.name}` : "New savings goal",
+		submitLabel: existing ? "Save" : "Add goal",
+		extraActions: existing ? [button("Delete", async () => {
+			if (!await confirmDialog(`Delete ${existing.name}?`, "This removes the goal and its progress. You can undo right after.", "Delete")) return;
+			document.querySelectorAll("dialog").forEach((d) => d.close());
+			store.update(`Delete ${existing.name}`, (d) => {
+				d.budget.goals = d.budget.goals.filter((x) => x.id !== existing.id);
+			});
+			toast(`Deleted ${existing.name}`, {
+				label: "Undo",
+				run: () => store.undo()
+			});
+		}, {
+			variant: "danger",
+			icon: "trash"
+		})] : [],
+		body: () => h("div", { class: "grid-form" }, field("What for", h("input", {
+			name: "name",
+			required: true,
+			value: existing?.name ?? "",
+			placeholder: "Emergency fund",
+			autocomplete: "off"
+		})), h("div", { class: "pair" }, field("Target", h("input", {
+			name: "target",
+			required: true,
+			inputMode: "decimal",
+			class: "num",
+			value: existing ? toInputValue(existing.target, cur) : "",
+			placeholder: "1500"
+		})), field("Saved so far", h("input", {
+			name: "saved",
+			inputMode: "decimal",
+			class: "num",
+			value: existing ? toInputValue(existing.saved, cur) : "0"
+		}))), field("By (optional)", h("input", {
+			name: "by",
+			type: "date",
+			min: ctx.today,
+			value: existing?.by ?? ""
+		}), "With a date, Tally tells you how much to put aside each month.")),
+		onSubmit: (data) => {
+			const name = String(data.get("name")).trim();
+			const target = parseMoney(String(data.get("target")), cur);
+			const saved = parseMoney(String(data.get("saved") || "0"), cur);
+			const by = String(data.get("by") ?? "");
+			if (!name) return "Give the goal a name.";
+			if (target === null || target <= 0) return "Enter a target amount, like 1500.";
+			if (saved === null || saved < 0) return "Enter how much you’ve saved so far, or 0.";
+			if (by && !isISODate(by)) return "Choose a valid date, or leave it blank.";
+			const goal = {
+				id: existing?.id ?? uid(),
+				name,
+				target,
+				saved,
+				...by ? { by } : {}
+			};
+			store.update(existing ? `Edit ${name}` : `Add ${name}`, (d) => {
+				const i = d.budget.goals.findIndex((x) => x.id === goal.id);
+				if (i >= 0) d.budget.goals[i] = goal;
+				else d.budget.goals.push(goal);
+			});
+		}
+	});
+}
+function addToGoal(ctx, g) {
+	const cur = ctx.state.settings.currency;
+	const p = goalProgress(g, ctx.today);
+	openDialog({
+		title: `Add to ${g.name}`,
+		submitLabel: "Add",
+		body: () => h("div", { class: "grid-form" }, field("Amount", h("input", {
+			name: "amount",
+			required: true,
+			inputMode: "decimal",
+			class: "num",
+			value: p.perMonth ? toInputValue(Math.min(p.perMonth, p.remaining), cur) : ""
+		}), "Use a minus sign to take money out.")),
+		onSubmit: (data) => {
+			const v = parseMoney(String(data.get("amount")), cur);
+			if (v === null || v === 0) return "Enter an amount, like 50.";
+			store.update(`${v > 0 ? "Add to" : "Take from"} ${g.name}`, (d) => {
+				const x = d.budget.goals.find((y) => y.id === g.id);
+				if (x) x.saved = Math.max(0, x.saved + v);
+			});
+			const after = Math.max(0, g.saved + v);
+			toast(after >= g.target ? `You reached ${g.name}!` : `${formatMoney(after, cur)} saved toward ${g.name}`, {
+				label: "Undo",
+				run: () => store.undo()
+			});
+		}
+	});
+}
+function insightsCard(ctx, month, through) {
+	const { money, state } = ctx;
+	const b = state.budget;
+	const cats = spentByCategory(b.spending, state.subscriptions, month, through);
+	const tips = monthOf(ctx.today) === month ? insights(b, state.subscriptions, ctx.today, money) : [];
+	const totals = lastMonths(month, 6).map((m) => ({
+		month: m,
+		total: monthTotal(b.spending, state.subscriptions, m, m === monthOf(ctx.today) ? ctx.today : void 0)
+	}));
+	const hasData = cats.length > 0 || totals.some((t) => t.total > 0);
+	return h("div", { class: "card insights" }, h("div", { class: "card-head" }, h("h3", null, "Insights")), tips.length ? h("ul", { class: "tips" }, tips.slice(0, 4).map((t) => h("li", null, icon(t.saves ? "piggy-bank" : t.id.startsWith("over") || t.id.startsWith("pace") ? "triangle-alert" : "sparkles", 17), h("div", null, h("p", { class: "strong" }, t.title), h("p", { class: "hint" }, t.detail)), t.saves ? h("span", { class: "tip-save num" }, `${money(t.saves)}/yr`) : null))) : null, hasData ? h("div", { class: "insight-charts" }, categoryChart(ctx, cats, month), trendChart(ctx, totals, month)) : empty("Nothing to chart yet", "Log spending, scan a receipt or import a bank CSV, and your charts appear here."));
+}
+/** Horizontal bars: one series (amount by category), so one colour and direct labels. */
+function categoryChart(ctx, cats, month) {
+	const { money } = ctx;
+	const max = Math.max(1, ...cats.map((c) => c.amount));
+	const total = cats.reduce((a, c) => a + c.amount, 0) || 1;
+	return h("figure", { class: "hbar-fig" }, h("figcaption", { class: "eyebrow" }, `Where it went in ${formatDate(`${month}-01`, void 0, {
+		month: "long",
+		day: void 0
+	})}`), cats.length ? h("ul", { class: "hbars" }, cats.map((c) => h("li", { title: `${c.category}: ${money(c.amount)} (${Math.round(c.amount / total * 100)}%)` }, h("span", { class: "hbar-label" }, c.category), h("span", { class: "hbar-track" }, h("span", {
+		class: "hbar",
+		style: { width: `${c.amount / max * 100}%` }
+	})), h("span", { class: "num hbar-val" }, money(c.amount))))) : h("p", { class: "hint" }, "No spending logged this month yet."));
+}
+/** Six months of totals as columns, with the average as a dashed reference line. */
+function trendChart(ctx, totals, month) {
+	const { money } = ctx;
+	const cur = ctx.state.settings.currency, W = 420, H = 170, top = 22, gap = 14;
+	const bw = (W - gap * (totals.length - 1)) / totals.length;
+	const logged = new Set(ctx.state.budget.spending.map((x) => monthOf(x.date)));
+	const past = totals.filter((t) => t.month !== monthOf(ctx.today) && logged.has(t.month));
+	const avg = past.length ? Math.round(past.reduce((a, t) => a + t.total, 0) / past.length) : 0;
+	const max = Math.max(1, avg, ...totals.map((t) => t.total));
+	const y = (v) => top + 124 * (1 - v / max);
+	const label = (m) => formatDate(`${m}-01`, void 0, {
+		month: "short",
+		day: void 0
+	});
+	const chart = svg("svg", {
+		viewBox: `0 0 ${W} ${H}`,
+		class: "trend",
+		role: "img",
+		"aria-label": `Total spending per month: ${totals.map((t) => `${label(t.month)} ${money(t.total)}`).join(", ")}.${avg ? ` Average ${money(avg)}.` : ""}`
+	});
+	totals.forEach((t, i) => {
+		const x = i * (bw + gap);
+		const g = svg("g", { class: ["tr-col", t.month === month ? "on" : ""].join(" ") });
+		g.appendChild(svg("rect", {
+			x,
+			y: top,
+			width: bw,
+			height: 124,
+			class: "tr-hit"
+		}));
+		g.appendChild(svg("rect", {
+			x,
+			y: y(t.total),
+			width: bw,
+			height: Math.max(0, 146 - y(t.total)),
+			rx: 3,
+			class: "tr-bar"
+		}));
+		const tt = svg("title");
+		tt.textContent = `${label(t.month)}: ${money(t.total)}`;
+		g.appendChild(tt);
+		const lbl = svg("text", {
+			x: x + bw / 2,
+			y: 163,
+			class: "fc-label",
+			"text-anchor": "middle"
+		});
+		lbl.textContent = label(t.month);
+		g.appendChild(lbl);
+		if (t.month === month && t.total > 0) {
+			const v = svg("text", {
+				x: x + bw / 2,
+				y: y(t.total) - 6,
+				class: "fc-value",
+				"text-anchor": "middle"
+			});
+			v.textContent = formatMoney(t.total, cur, { compact: t.total >= 1e5 });
+			g.appendChild(v);
+		}
+		g.addEventListener("click", () => {
+			viewMonth = t.month === monthOf(ctx.today) ? null : t.month;
+			ctx.rerender();
+		});
+		chart.appendChild(g);
+	});
+	if (avg) chart.appendChild(svg("line", {
+		x1: 0,
+		x2: W,
+		y1: y(avg),
+		y2: y(avg),
+		class: "fc-avg"
+	}));
+	return h("figure", { class: "trend-fig" }, h("figcaption", { class: "eyebrow" }, "Last six months"), chart, h("p", { class: "hint" }, avg ? `Dashed line: your average of ${money(avg)} a month. Click a month to see it.` : "Click a month to see it."), h("details", { class: "chart-table" }, h("summary", null, "Show as a table"), h("table", { class: "table" }, h("thead", null, h("tr", null, h("th", null, "Month"), h("th", { class: "r" }, "Spent"))), h("tbody", null, totals.map((t) => h("tr", null, h("td", null, label(t.month)), h("td", { class: "r num" }, money(t.total))))))));
+}
+function spendingCard(ctx, month) {
+	const { money, state } = ctx;
+	const entries = state.budget.spending.filter((s) => monthOf(s.date) === month).sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
+	const shown = showAllSpending ? entries : entries.slice(0, 8);
+	return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Spending"), h("p", { class: "hint" }, "Subscriptions count automatically, so they aren’t listed here.")), entries.length ? h("ul", { class: "spend-list" }, shown.map((s) => h("li", null, h("span", {
+		class: "spend-src",
+		title: SOURCE[s.source].label
+	}, icon(SOURCE[s.source].icon, 15), h("span", { class: "sr-only" }, SOURCE[s.source].label)), h("span", { class: "spend-main" }, s.note || s.category, h("span", { class: "svc-meta" }, `${s.category} · ${formatDate(s.date)}`)), h("span", { class: "num strong" }, money(s.amount)), button("", () => editSpend(ctx, s), {
+		icon: "pencil",
+		title: `Edit ${s.note || s.category}`,
+		variant: "quiet",
+		small: true,
+		key: `spend-${s.id}`
+	})))) : empty("Nothing logged for this month", "Log what you spend, scan a receipt, or import your bank’s CSV export."), entries.length > 8 ? h("div", { class: "row end" }, button(showAllSpending ? "Show fewer" : `Show all ${entries.length}`, () => {
+		showAllSpending = !showAllSpending;
+		ctx.rerender();
+	}, {
+		small: true,
+		variant: "quiet"
+	})) : null);
+}
+function editSpend(ctx, existing) {
+	const cur = ctx.state.settings.currency;
+	openDialog({
+		title: existing ? "Edit spending" : "Log spending",
+		submitLabel: existing ? "Save" : "Log it",
+		extraActions: existing ? [button("Delete", () => {
+			document.querySelectorAll("dialog").forEach((d) => d.close());
+			store.update("Delete spending", (d) => {
+				d.budget.spending = d.budget.spending.filter((x) => x.id !== existing.id);
+			});
+			toast("Deleted", {
+				label: "Undo",
+				run: () => store.undo()
+			});
+		}, {
+			variant: "danger",
+			icon: "trash"
+		})] : [],
+		body: () => h("div", { class: "grid-form" }, h("div", { class: "pair" }, field("Amount", h("input", {
+			name: "amount",
+			required: true,
+			inputMode: "decimal",
+			class: "num",
+			value: existing ? toInputValue(existing.amount, cur) : "",
+			placeholder: "12.50"
+		})), field("Date", h("input", {
+			name: "date",
+			type: "date",
+			required: true,
+			value: existing?.date ?? ctx.today
+		}))), field("Category", h("select", { name: "category" }, SPEND_CATEGORIES.map((c) => h("option", {
+			value: c,
+			selected: c === (existing?.category ?? "Groceries")
+		}, c)))), field("Note", h("input", {
+			name: "note",
+			value: existing?.note ?? "",
+			placeholder: "Where or what",
+			autocomplete: "off"
+		}))),
+		onSubmit: (data) => {
+			const amount = parseMoney(String(data.get("amount")), cur);
+			const date = String(data.get("date"));
+			if (amount === null || amount <= 0) return "Enter an amount, like 12.50.";
+			if (!isISODate(date)) return "Choose a date.";
+			const entry = {
+				id: existing?.id ?? uid(),
+				date,
+				amount,
+				category: String(data.get("category")),
+				note: String(data.get("note") ?? "").trim(),
+				source: existing?.source ?? "manual"
+			};
+			store.update(existing ? "Edit spending" : `Log ${entry.note || entry.category}`, (d) => {
+				const i = d.budget.spending.findIndex((x) => x.id === entry.id);
+				if (i >= 0) d.budget.spending[i] = entry;
+				else d.budget.spending.push(entry);
+			});
+			if (!existing) {
+				viewMonth = monthOf(date) === monthOf(ctx.today) ? null : monthOf(date);
+				toast(`Logged ${formatMoney(amount, cur)} under ${entry.category}`, {
+					label: "Undo",
+					run: () => store.undo()
+				});
+			}
+		}
+	});
+}
+function pickCSV(ctx) {
+	const input = h("input", {
+		type: "file",
+		accept: ".csv,text/csv"
+	});
+	input.addEventListener("change", () => {
+		const f = input.files?.[0];
+		if (f) importSpending(f, ctx);
+	});
+	input.click();
+}
+/**
+* Log a bank export as spending. Charges that match a tracked subscription
+* are skipped (they already count automatically), and anything already
+* logged is skipped, so importing the same file twice is harmless.
+*/
+async function importSpending(file, ctx) {
+	const cur = ctx.state.settings.currency;
+	let txns;
+	try {
+		txns = extractTransactions(parseCSV(await file.text()), cur);
+	} catch (e) {
+		return toast(e instanceof Error ? e.message : "Could not read that file.");
+	}
+	if (!txns.length) return toast("No outgoing charges found in that file.");
+	const subNames = ctx.state.subscriptions.map((s) => s.name.toLowerCase());
+	const isSub = (desc) => {
+		const m = normalizeMerchant(desc).toLowerCase();
+		return subNames.some((n) => n && (m.includes(n) || n.includes(m)));
+	};
+	const known = new Set(ctx.state.budget.spending.map(spendKey));
+	const fresh = [];
+	let dupes = 0, subs = 0;
+	for (const t of txns) {
+		if (isSub(t.description)) {
+			subs++;
+			continue;
+		}
+		const s = {
+			id: uid(),
+			date: t.date,
+			amount: t.amount,
+			category: categorize(t.description),
+			note: normalizeMerchant(t.description),
+			source: "bank"
+		};
+		const k = spendKey(s);
+		if (known.has(k)) {
+			dupes++;
+			continue;
+		}
+		known.add(k);
+		fresh.push(s);
+	}
+	const byCat = /* @__PURE__ */ new Map();
+	fresh.forEach((s) => byCat.set(s.category, (byCat.get(s.category) ?? 0) + s.amount));
+	const dates = fresh.map((s) => s.date).sort();
+	openDialog({
+		title: "Import spending",
+		submitLabel: fresh.length ? `Import ${fresh.length}` : "Done",
+		infoOnly: !fresh.length,
+		body: () => h("div", null, h("p", null, fresh.length ? `Found ${fresh.length} new charges from ${formatDate(dates[0], void 0, { year: "numeric" })} to ${formatDate(dates.at(-1), void 0, { year: "numeric" })}.` : "Everything in this file is already logged."), subs || dupes ? h("p", { class: "hint" }, [subs ? `${subs} look like your tracked subscriptions and are skipped, since they already count.` : "", dupes ? `${dupes} were already logged.` : ""].filter(Boolean).join(" ")) : null, fresh.length ? h("table", { class: "table" }, h("thead", null, h("tr", null, h("th", null, "Category (best guess)"), h("th", { class: "r" }, "Total"))), h("tbody", null, [...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([c, v]) => h("tr", null, h("td", null, c), h("td", { class: "r num" }, ctx.money(v)))))) : null, fresh.length ? h("p", { class: "hint" }, "You can change any category afterwards by editing the entry.") : null),
+		onSubmit: () => {
+			if (!fresh.length) return;
+			store.update(`Import ${fresh.length} charges`, (d) => {
+				d.budget.spending.push(...fresh);
+			});
+			const last = monthOf(dates.at(-1));
+			viewMonth = last === monthOf(ctx.today) ? null : last;
+			toast(`Imported ${fresh.length} charges`, {
+				label: "Undo",
+				run: () => store.undo()
+			});
+		}
+	});
+}
+//#endregion
 //#region src/main.ts
 var TABS = [
 	{
 		id: "subscriptions",
 		label: "Subscriptions",
+		short: "Subs",
 		icon: "repeat"
 	},
 	{
@@ -6895,6 +8770,11 @@ var TABS = [
 		id: "cart",
 		label: "Cart",
 		icon: "shopping-cart"
+	},
+	{
+		id: "budget",
+		label: "Budget",
+		icon: "wallet"
 	},
 	{
 		id: "sync",
@@ -6911,6 +8791,7 @@ var VIEWS = {
 	subscriptions: subscriptionsView,
 	split: splitView,
 	cart: cartView,
+	budget: budgetView,
 	sync: syncView,
 	help: helpView
 };
@@ -7019,7 +8900,10 @@ function renderNav() {
 		class: "tab",
 		"aria-current": t.id === tab ? "page" : void 0,
 		title: `${t.label} (${i + 1})`
-	}, icon(t.icon, 18), h("span", null, t.label))));
+	}, icon(t.icon, 18), t.short ? [h("span", { class: "tab-full" }, t.label), h("span", {
+		class: "tab-short",
+		"aria-hidden": "true"
+	}, t.short)] : h("span", null, t.label))));
 }
 var lastTab = null;
 function render() {
@@ -7063,6 +8947,7 @@ function runRouteAction(ctx) {
 		if (tab === "subscriptions") editSubscription(ctx);
 		else if (tab === "split") editExpense(ctx);
 		else if (tab === "cart") document.querySelector(".quick-add input")?.focus();
+		else if (tab === "budget") editSpend(ctx);
 	});
 }
 /** "Ask" button: opens the help desk from any screen. */
@@ -7075,6 +8960,7 @@ var askFab = h("button", {
 function openFile(file) {
 	const name = file.name.toLowerCase();
 	if (name.endsWith(".csv") || file.type === "text/csv") {
+		if (currentTab() === "budget") return void importSpending(file, makeContext(today(), render, go));
 		if (currentTab() !== "subscriptions") location.hash = "/subscriptions";
 		importBankCSV(file, makeContext(today(), render, go));
 		render();
@@ -7128,7 +9014,7 @@ function undo() {
 }
 function showShortcuts() {
 	const rows = [
-		["1 – 5", "Switch section"],
+		["1 – 6", "Switch section"],
 		["H", "Ask the help desk"],
 		["N", "Add to the current section"],
 		["U", "Undo last change"],
@@ -7155,6 +9041,7 @@ document.addEventListener("keydown", (e) => {
 			if (currentTab() === "subscriptions") editSubscription(ctx());
 			else if (currentTab() === "split") editExpense(ctx());
 			else if (currentTab() === "cart") document.querySelector(".quick-add input")?.focus();
+			else if (currentTab() === "budget") editSpend(ctx());
 			else if (currentTab() === "help") document.querySelector(".chat-tab .composer input")?.focus();
 			break;
 		case "h":
@@ -8067,7 +9954,7 @@ select:focus-visible {
 }
 .search {
   position: relative;
-  flex: 1 1 220px;
+  flex: 1 1 160px;
   max-width: 340px;
   display: flex;
   align-items: center;
@@ -9342,6 +11229,388 @@ select:focus-visible {
   }
 }
 
+/* ---------- budget ---------- */
+
+.bud-actions {
+  margin: 0;
+}
+.bud-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 40px;
+}
+.bud-month {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bud-month h3 {
+  min-width: 11ch;
+  text-align: center;
+  margin: 0;
+}
+.bud-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 40px;
+  align-items: end;
+}
+.bud-figures .figure {
+  margin: 2px 0;
+}
+.bud-col {
+  display: grid;
+  gap: var(--gap);
+  min-width: 0;
+}
+.bud-list,
+.goal-list,
+.spend-list,
+.tips,
+.hbars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bud-list,
+.goal-list {
+  display: grid;
+  gap: 16px;
+}
+.bud-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bud-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--seal);
+}
+.bud-level .icon {
+  align-self: center;
+}
+.lvl-warn .bud-level {
+  color: var(--ochre);
+}
+.lvl-over .bud-level {
+  color: var(--serial);
+}
+.bud-bar {
+  position: relative;
+  height: 10px;
+  margin: 6px 0 4px;
+  border-radius: 99px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.bud-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 99px;
+  background: var(--seal);
+  transition: width 0.3s ease;
+}
+.lvl-warn .bud-fill {
+  background: var(--ochre);
+}
+.lvl-over .bud-fill {
+  background: var(--serial);
+}
+.bud-bar.goal .bud-fill {
+  background: var(--ink);
+}
+.goal-list li.done .bud-bar.goal .bud-fill {
+  background: var(--seal);
+}
+.bud-pace {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  box-shadow: 0 0 0 1px var(--card);
+}
+.bud-list .hint,
+.goal-list .hint {
+  margin: 0;
+}
+.goal-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.goal-foot .hint {
+  flex: 1 1 160px;
+}
+.bud-level.ok {
+  color: var(--seal);
+}
+.bud-form {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin-top: 12px;
+}
+
+.tips {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.tips li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--card-2);
+}
+.tips li > .icon {
+  margin-top: 2px;
+  color: var(--ink-2);
+}
+.tips p {
+  margin: 0;
+}
+.tip-save {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--seal);
+  white-space: nowrap;
+}
+.insight-charts {
+  display: grid;
+  gap: 22px;
+}
+.insight-charts figure {
+  margin: 0;
+}
+.insight-charts figcaption {
+  margin-bottom: 10px;
+}
+.hbars {
+  display: grid;
+  gap: 8px;
+}
+.hbars li {
+  display: grid;
+  grid-template-columns: minmax(84px, 9rem) 1fr auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.88rem;
+}
+.hbar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.hbar-track {
+  height: 12px;
+}
+.hbar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ink);
+}
+.hbars li:hover .hbar {
+  background: var(--seal);
+}
+.hbar-val {
+  font-size: 0.8rem;
+  text-align: right;
+}
+.trend {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+}
+.tr-hit {
+  fill: transparent;
+}
+.tr-col {
+  cursor: pointer;
+}
+.tr-bar {
+  fill: color-mix(in srgb, var(--ink) 30%, var(--card));
+}
+.tr-col.on .tr-bar {
+  fill: var(--ink);
+}
+.tr-col:hover .tr-bar {
+  fill: var(--seal);
+}
+.trend-fig .hint {
+  margin: 6px 0 0;
+}
+.chart-table {
+  margin-top: 8px;
+  font-size: 0.86rem;
+}
+.chart-table summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.spend-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.spend-list li:last-child {
+  border-bottom: 0;
+}
+.spend-src {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--ink-2);
+}
+.spend-main {
+  display: grid;
+  min-width: 0;
+}
+
+/* ---------- receipt scanning ---------- */
+
+.scan {
+  display: grid;
+  gap: 14px;
+}
+.dialog:has(.scan) {
+  width: min(640px, calc(100vw - 24px));
+}
+.scan-drop {
+  padding: 26px 18px;
+}
+.scan-paste summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.scan-paste[open] {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.scan-paste textarea {
+  width: 100%;
+  font: 0.85rem/1.5 var(--f-mono);
+}
+.scan-pick {
+  display: grid;
+  gap: 12px;
+}
+.scan-pick[hidden] {
+  display: none;
+}
+.scan-progress {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+.scan-progress progress {
+  width: 100%;
+  accent-color: var(--ink);
+}
+.scan-status:empty {
+  display: none;
+}
+.scan-review {
+  display: grid;
+  gap: 12px;
+}
+.scan-review:empty {
+  display: none;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.scan-items input:not([type='checkbox']) {
+  width: 100%;
+  min-width: 0;
+}
+.scan-items td {
+  padding: 4px 6px;
+}
+.scan-items {
+  table-layout: fixed;
+  width: 100%;
+}
+.scan-items th:first-child {
+  width: 34px;
+}
+.scan-items th:nth-child(3) {
+  width: 5.5em;
+}
+.scan-items .qty-in {
+  padding-left: 6px;
+  padding-right: 4px;
+}
+.scan-items th:nth-child(4) {
+  width: 7.5em;
+}
+.scan-items th:last-child {
+  width: 40px;
+}
+.scan-items td.r input {
+  text-align: right;
+}
+.scan-sum {
+  justify-self: end;
+}
+.scan-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.scan-check .icon {
+  flex: none;
+  margin-top: 2px;
+}
+.scan-check.ok {
+  color: var(--seal);
+}
+.scan-check.warn {
+  color: var(--ochre);
+}
+.scan-target {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px dashed var(--line);
+}
+.scan-target legend {
+  padding: 0;
+  font-weight: 600;
+}
+.tab-short {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -9411,12 +11680,52 @@ select:focus-visible {
     margin-left: auto;
   }
   .tab {
+    flex: 1 1 0;
+    min-width: 0;
     flex-direction: column;
     gap: 2px;
-    font-size: 0.72rem;
-    padding: 6px 10px;
+    font-size: 0.7rem;
+    padding: 6px 2px;
     border-radius: 10px;
   }
+  /* Visually hidden but still the link's accessible name. */
+  .tab-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tab-short {
+    display: inline;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .tips li {
+    grid-template-columns: auto 1fr;
+  }
+  .tip-save {
+    grid-column: 2;
+  }
+  .scan-items tr {
+    display: grid !important;
+    grid-template-columns: 28px 1fr 1.3fr 32px;
+    gap: 6px;
+    align-items: center;
+    padding: 10px 0 !important;
+  }
+  .scan-items td:nth-child(2) {
+    grid-column: 2 / -1;
+  }
+  .scan-items td:nth-child(3) {
+    grid-column: 2;
+  }
+  .scan-items td:nth-child(4) {
+    grid-column: 3;
+  }
+
   .toasts {
     bottom: calc(76px + env(safe-area-inset-bottom));
   }

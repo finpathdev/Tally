@@ -8,11 +8,16 @@
  * - A new version waits until the app asks it to take over, so an update
  *   never swaps code under someone mid-edit. The app shows a "Reload" toast.
  * - Only same-origin GETs are handled; GitHub API and FX requests always go
- *   to the network.
+ *   to the network. The one exception is the receipt reader: its pinned,
+ *   versioned files from jsDelivr are cached after the first scan so
+ *   scanning also works offline. No photo or personal data is ever sent.
  */
-const VERSION = '9b1adcbbe4ae';
+const VERSION = '90c781b86001';
 const PRECACHE = ["./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
 const CACHE = `tally-${VERSION}`;
+// Kept across app updates: the files are versioned in their URLs.
+const OCR_CACHE = 'ocr-v1';
+const OCR_FILES = /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js@|tesseract\.js-core@|@tesseract\.js-data\/)/;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', ...PRECACHE])));
@@ -34,6 +39,17 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+  if (req.method === 'GET' && OCR_FILES.test(req.url)) {
+    event.respondWith(
+      caches.open(OCR_CACHE).then((c) =>
+        c.match(req).then((hit) => hit || fetch(req).then((res) => {
+          if (res.ok) c.put(req, res.clone());
+          return res;
+        })),
+      ),
+    );
+    return;
+  }
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {

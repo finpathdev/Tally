@@ -1,6 +1,26 @@
+<div align="center">
+
 # Tally
 
-A local-first money dashboard: subscriptions, fair group splits, a tax-aware cart, and a help desk that explains everything. Your data stays in your browser.
+**Know where every dollar goes, and keep the ones you don't need.**
+
+<img src="tally-preview.png" alt="Tally's Budget tab on desktop and phone: monthly budgets, savings goals and spending insights" width="100%">
+
+</div>
+
+A local-first money dashboard. No account, no server, no tracking: your data stays in your browser.
+
+| | |
+| :-- | :-- |
+| **Subscriptions** | Every recurring charge, what it really costs, when it renews, and which ones to cancel. Finds forgotten ones in a bank export. |
+| **Split** | Shared costs split equally, by income, by shares or exact amounts, settled in the fewest possible payments. |
+| **Cart** | A shopping list with the real total, tax included, and a budget meter. |
+| **Budget** | Monthly budgets per category, savings goals, charts of where your money goes, and saving tips that show their math. |
+| **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items or a split. |
+| **Help desk** | A built-in help library, plus optional AI answers. |
+| **Sync & alerts** | Optional: save to your own GitHub repo (encrypted if you like) and get an email before every renewal. |
+
+It installs like an app, works offline, and has light and dark themes.
 
 This is the **one-file version**: the whole app is in `index.html`, and everything else sits next to it in the same folder.
 
@@ -14,6 +34,7 @@ This is the **one-file version**: the whole app is in `index.html`, and everythi
 | `tally-manifest.webmanifest` | Lets people install Tally as an app |
 | `tally-sw.js` | Makes Tally work offline and handles reminders |
 | `tally-renewal-check.mjs` | Optional: powers email alerts before renewals (see below) |
+| `tally-preview.png` | The picture at the top of this page. Also use it as the repository's social preview (see below) |
 
 ## Put it on GitHub Pages
 
@@ -23,6 +44,10 @@ This is the **one-file version**: the whole app is in `index.html`, and everythi
 4. Wait about a minute and open `https://<your-username>.github.io/<repository>/`.
 
 To update later, upload the changed files again. Uploading replaces files with the same name.
+
+## Make links to your repository look good
+
+On GitHub, open **Settings → General**, scroll to **Social preview**, click **Edit → Upload an image**, and choose `tally-preview.png`. Links to the repository then show that picture.
 
 ## Edit it
 
@@ -37,6 +62,10 @@ You can open `index.html` straight from your computer to try changes. Offline mo
 3. Turn on **Issues** in **Settings → General → Features**.
 
 Every morning GitHub checks your renewals and opens an issue for anything coming up, and GitHub emails you about it.
+
+## Receipt scanning and privacy
+
+Receipt photos are read by a text-recognition engine running in your browser; the photo is never uploaded. The first scan downloads the engine (about 5 MB) from jsDelivr, a public code library, and after that it's cached, so scanning works offline too.
 
 ## Optional: AI answers in the help desk
 
