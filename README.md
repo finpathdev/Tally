@@ -17,10 +17,11 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 | **Cart** | A shopping list with the real total, tax included, and a budget meter. |
 | **Budget** | Monthly budgets per category, savings goals, charts of where your money goes, and saving tips that show their math. |
 | **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items or a split. |
+| **Alternatives** | Ideas for cheaper, better or better-value alternatives to anything you pay for, with a shortlist. |
 | **Help desk** | A built-in help library, plus optional AI answers. |
 | **Sync & alerts** | Optional: save to your own GitHub repo (encrypted if you like) and get an email before every renewal. |
 
-It installs like an app, works offline, and has light and dark themes.
+It installs like an app (click **Get the app**: there's a QR code to open it on your phone, and steps for iPhone, Android and computers), works offline, and has light and dark themes.
 
 This is the **one-file version**: the whole app is in `index.html`, and everything else sits next to it in the same folder.
 
@@ -57,9 +58,12 @@ You can open `index.html` straight from your computer to try changes. Offline mo
 
 ## Optional: email alerts before renewals
 
-1. In the app, open **Sync** and follow the steps to save your subscriptions to this repository.
-2. On the same page, click **Create the alerts workflow**. It opens GitHub with the file already filled in; click **Commit changes**.
+Tally works without this. It's only for getting an email from GitHub a few days before each subscription renews.
+
+1. In the app, open **Sync → Email alerts before renewals → Show steps**.
+2. Click **Create the alerts workflow**. It opens GitHub with the file already filled in; click **Commit changes**.
 3. Turn on **Issues** in **Settings → General → Features**.
+4. Back in Tally, check **Owner** is your GitHub **username** (not your email) and **Repository** is this repository's name. On your site they're filled in for you. Create a token as the app explains, keep **Encrypt** on (this repository is public, so your list is stored scrambled), and click **Commit to GitHub**. Add the same passphrase as a repository secret named `TALLY_PASSPHRASE`.
 
 Every morning GitHub checks your renewals and opens an issue for anything coming up, and GitHub emails you about it.
 
@@ -67,9 +71,9 @@ Every morning GitHub checks your renewals and opens an issue for anything coming
 
 Receipt photos are read by a text-recognition engine running in your browser; the photo is never uploaded. The first scan downloads the engine (about 5 MB) from jsDelivr, a public code library, and after that it's cached, so scanning works offline too.
 
-## Optional: AI answers in the help desk
+## Optional: AI answers in the help desk and Alternatives
 
-The help desk always works using its built-in help library. For AI-written answers, open **Help → AI assistant** and add a free Google Gemini key (the app shows you how), or set up the shared proxy described in the full project so no visitor needs a key.
+The help desk always works using its built-in help library, and Alternatives always shows ways to pay less. For AI-written answers and specific alternatives, open **Help → AI assistant** and add a free Google Gemini key (the app shows you how), or set up the shared proxy described in the full project so no visitor needs a key.
 
 ---
 

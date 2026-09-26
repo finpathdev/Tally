@@ -305,6 +305,7 @@ function emptyState() {
 			limits: {},
 			goals: []
 		},
+		alternatives: { shortlist: [] },
 		sync: {
 			owner: "",
 			repo: "",
@@ -681,6 +682,29 @@ var SOURCES = [
 	"bank",
 	"cart"
 ];
+var GOALS = [
+	"cheaper",
+	"better",
+	"value"
+];
+function parseAlternatives(v) {
+	return { shortlist: arr((isObj(v) ? v : {}).shortlist ?? [], "alternatives.shortlist").map((x, i) => {
+		const w = `alternatives.shortlist[${i}]`;
+		if (!isObj(x)) throw new SchemaError(w);
+		const out = {
+			id: str(x.id, `${w}.id`),
+			name: str(x.name, `${w}.name`),
+			priceText: str(x.priceText ?? "", `${w}.priceText`),
+			monthly: x.monthly === null || x.monthly === void 0 ? null : int(x.monthly, `${w}.monthly`),
+			why: str(x.why ?? "", `${w}.why`),
+			goal: oneOf(x.goal ?? "cheaper", GOALS, `${w}.goal`),
+			forName: str(x.forName ?? "", `${w}.forName`),
+			savedOn: date(x.savedOn, `${w}.savedOn`)
+		};
+		if (typeof x.forSubId === "string") out.forSubId = x.forSubId;
+		return out;
+	}) };
+}
 function parseBudget(v) {
 	const b = isObj(v) ? v : {};
 	const limits = {};
@@ -842,6 +866,7 @@ function parseV2(v) {
 			budget: int(cart.budget ?? base.cart.budget, "cart.budget")
 		},
 		budget: parseBudget(v.budget),
+		alternatives: parseAlternatives(v.alternatives),
 		sync: {
 			owner: str(sync.owner ?? "", "sync.owner"),
 			repo: str(sync.repo ?? "", "sync.repo"),
@@ -1584,7 +1609,127 @@ var ICONS = {
 		["path", { "d": "M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" }],
 		["path", { "d": "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }],
 		["path", { "d": "M12 17h.01" }]
-	]
+	],
+	"smartphone": [["rect", {
+		"width": "14",
+		"height": "20",
+		"x": "5",
+		"y": "2",
+		"rx": "2",
+		"ry": "2"
+	}], ["path", { "d": "M12 18h.01" }]],
+	"monitor": [
+		["rect", {
+			"width": "20",
+			"height": "14",
+			"x": "2",
+			"y": "3",
+			"rx": "2"
+		}],
+		["line", {
+			"x1": "8",
+			"x2": "16",
+			"y1": "21",
+			"y2": "21"
+		}],
+		["line", {
+			"x1": "12",
+			"x2": "12",
+			"y1": "17",
+			"y2": "21"
+		}]
+	],
+	"qr-code": [
+		["rect", {
+			"width": "5",
+			"height": "5",
+			"x": "3",
+			"y": "3",
+			"rx": "1"
+		}],
+		["rect", {
+			"width": "5",
+			"height": "5",
+			"x": "16",
+			"y": "3",
+			"rx": "1"
+		}],
+		["rect", {
+			"width": "5",
+			"height": "5",
+			"x": "3",
+			"y": "16",
+			"rx": "1"
+		}],
+		["path", { "d": "M21 16h-3a2 2 0 0 0-2 2v3" }],
+		["path", { "d": "M21 21v.01" }],
+		["path", { "d": "M12 7v3a2 2 0 0 1-2 2H7" }],
+		["path", { "d": "M3 12h.01" }],
+		["path", { "d": "M12 3h.01" }],
+		["path", { "d": "M12 16v.01" }],
+		["path", { "d": "M16 12h1" }],
+		["path", { "d": "M21 12v.01" }],
+		["path", { "d": "M12 21v-1" }]
+	],
+	"ellipsis-vertical": [
+		["circle", {
+			"cx": "12",
+			"cy": "12",
+			"r": "1"
+		}],
+		["circle", {
+			"cx": "12",
+			"cy": "5",
+			"r": "1"
+		}],
+		["circle", {
+			"cx": "12",
+			"cy": "19",
+			"r": "1"
+		}]
+	],
+	"share": [
+		["path", { "d": "M12 2v13" }],
+		["path", { "d": "m16 6-4-4-4 4" }],
+		["path", { "d": "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }]
+	],
+	"scale": [
+		["path", { "d": "M12 3v18" }],
+		["path", { "d": "m19 8 3 8a5 5 0 0 1-6 0zV7" }],
+		["path", { "d": "M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" }],
+		["path", { "d": "m5 8 3 8a5 5 0 0 1-6 0zV7" }],
+		["path", { "d": "M7 21h10" }]
+	],
+	"gem": [
+		["path", { "d": "M10.5 3 8 9l4 13 4-13-2.5-6" }],
+		["path", { "d": "M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z" }],
+		["path", { "d": "M2 9h20" }]
+	],
+	"lightbulb": [
+		["path", { "d": "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" }],
+		["path", { "d": "M9 18h6" }],
+		["path", { "d": "M10 22h4" }]
+	],
+	"bookmark": [["path", { "d": "M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" }]],
+	"arrow-right-left": [
+		["path", { "d": "m16 3 4 4-4 4" }],
+		["path", { "d": "M20 7H4" }],
+		["path", { "d": "m8 21-4-4 4-4" }],
+		["path", { "d": "M4 17h16" }]
+	],
+	"tag": [["path", { "d": "M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" }], ["circle", {
+		"cx": "7.5",
+		"cy": "7.5",
+		"r": ".5",
+		"fill": "currentColor"
+	}]],
+	"badge-percent": [
+		["path", { "d": "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" }],
+		["path", { "d": "m15 9-6 6" }],
+		["path", { "d": "M9 9h.01" }],
+		["path", { "d": "M15 15h.01" }]
+	],
+	"star": [["path", { "d": "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" }]]
 };
 //#endregion
 //#region src/ui/dom.ts
@@ -1802,6 +1947,289 @@ function segmented(name, options, current, onChange) {
 	}, o.icon ? icon(o.icon, 15) : null, o.label)));
 }
 //#endregion
+//#region src/lib/qr.ts
+/**
+* A small QR code encoder: byte mode, error correction level M, versions
+* 1–10 (up to 213 bytes, plenty for a web address). Follows ISO/IEC 18004,
+* structured after Project Nayuki's reference implementation (MIT).
+* Returns a square grid of booleans (true = dark module), without the quiet
+* zone. Tested by decoding the output with an independent QR reader.
+*/
+var ECC_PER_BLOCK = [
+	-1,
+	10,
+	16,
+	26,
+	18,
+	24,
+	16,
+	18,
+	22,
+	22,
+	26
+];
+var NUM_BLOCKS = [
+	-1,
+	1,
+	1,
+	1,
+	2,
+	2,
+	4,
+	4,
+	4,
+	5,
+	5
+];
+var MAX_VERSION = 10;
+function rawDataModules(ver) {
+	let result = (16 * ver + 128) * ver + 64;
+	if (ver >= 2) {
+		const numAlign = Math.floor(ver / 7) + 2;
+		result -= (25 * numAlign - 10) * numAlign - 55;
+		if (ver >= 7) result -= 36;
+	}
+	return result;
+}
+var dataCodewords = (ver) => Math.floor(rawDataModules(ver) / 8) - ECC_PER_BLOCK[ver] * NUM_BLOCKS[ver];
+function gfMul(x, y) {
+	let z = 0;
+	for (let i = 7; i >= 0; i--) {
+		z = z << 1 ^ (z >>> 7) * 285;
+		z ^= (y >>> i & 1) * x;
+	}
+	return z & 255;
+}
+function rsDivisor(degree) {
+	const result = new Array(degree).fill(0);
+	result[degree - 1] = 1;
+	let root = 1;
+	for (let i = 0; i < degree; i++) {
+		for (let j = 0; j < result.length; j++) {
+			result[j] = gfMul(result[j], root);
+			if (j + 1 < result.length) result[j] = result[j] ^ result[j + 1];
+		}
+		root = gfMul(root, 2);
+	}
+	return result;
+}
+function rsRemainder(data, divisor) {
+	const result = divisor.map(() => 0);
+	for (const b of data) {
+		const factor = b ^ result.shift();
+		result.push(0);
+		divisor.forEach((coef, i) => {
+			result[i] = result[i] ^ gfMul(coef, factor);
+		});
+	}
+	return result;
+}
+function encodeData(bytes, ver) {
+	const bits = [];
+	const push = (val, len) => {
+		for (let i = len - 1; i >= 0; i--) bits.push(val >>> i & 1);
+	};
+	push(4, 4);
+	push(bytes.length, ver <= 9 ? 8 : 16);
+	bytes.forEach((b) => push(b, 8));
+	const capacity = dataCodewords(ver) * 8;
+	push(0, Math.min(4, capacity - bits.length));
+	push(0, (8 - bits.length % 8) % 8);
+	for (let pad = 236; bits.length < capacity; pad ^= 253) push(pad, 8);
+	const out = [];
+	for (let i = 0; i < bits.length; i += 8) out.push(bits.slice(i, i + 8).reduce((a, b) => a << 1 | b, 0));
+	return out;
+}
+function addEccAndInterleave(data, ver) {
+	const numBlocks = NUM_BLOCKS[ver];
+	const eccLen = ECC_PER_BLOCK[ver];
+	const rawCodewords = Math.floor(rawDataModules(ver) / 8);
+	const numShort = numBlocks - rawCodewords % numBlocks;
+	const shortLen = Math.floor(rawCodewords / numBlocks);
+	const divisor = rsDivisor(eccLen);
+	const blocks = [];
+	for (let i = 0, k = 0; i < numBlocks; i++) {
+		const dat = data.slice(k, k + shortLen - eccLen + (i < numShort ? 0 : 1));
+		k += dat.length;
+		const ecc = rsRemainder(dat, divisor);
+		if (i < numShort) dat.push(0);
+		blocks.push([...dat, ...ecc]);
+	}
+	const result = [];
+	for (let i = 0; i < blocks[0].length; i++) blocks.forEach((block, j) => {
+		if (i !== shortLen - eccLen || j >= numShort) result.push(block[i]);
+	});
+	return result;
+}
+var Grid = class {
+	ver;
+	size;
+	dark;
+	reserved;
+	constructor(ver) {
+		this.ver = ver;
+		this.size = ver * 4 + 17;
+		this.dark = Array.from({ length: this.size }, () => new Array(this.size).fill(false));
+		this.reserved = Array.from({ length: this.size }, () => new Array(this.size).fill(false));
+	}
+	set(x, y, dark) {
+		this.dark[y][x] = dark;
+		this.reserved[y][x] = true;
+	}
+};
+function alignmentPositions(ver) {
+	if (ver === 1) return [];
+	const numAlign = Math.floor(ver / 7) + 2;
+	const step = Math.ceil((ver * 4 + 4) / (numAlign * 2 - 2)) * 2;
+	const result = [6];
+	for (let pos = ver * 4 + 17 - 7; result.length < numAlign; pos -= step) result.splice(1, 0, pos);
+	return result;
+}
+function drawFunctionPatterns(g) {
+	const { size } = g;
+	for (let i = 0; i < size; i++) {
+		g.set(6, i, i % 2 === 0);
+		g.set(i, 6, i % 2 === 0);
+	}
+	const finder = (cx, cy) => {
+		for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+			const d = Math.max(Math.abs(dx), Math.abs(dy));
+			const x = cx + dx, y = cy + dy;
+			if (x >= 0 && x < size && y >= 0 && y < size) g.set(x, y, d !== 2 && d !== 4);
+		}
+	};
+	finder(3, 3);
+	finder(size - 4, 3);
+	finder(3, size - 4);
+	const align = alignmentPositions(g.ver);
+	align.forEach((ay, i) => align.forEach((ax, j) => {
+		if (i === 0 && j === 0 || i === 0 && j === align.length - 1 || i === align.length - 1 && j === 0) return;
+		for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) g.set(ax + dx, ay + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+	}));
+	drawFormatBits(g, 0);
+	drawVersion(g);
+}
+function drawFormatBits(g, mask) {
+	const data = 0 | mask;
+	let rem = data;
+	for (let i = 0; i < 10; i++) rem = rem << 1 ^ (rem >>> 9) * 1335;
+	const bits = (data << 10 | rem) ^ 21522;
+	const bit = (i) => (bits >>> i & 1) !== 0;
+	const { size } = g;
+	for (let i = 0; i <= 5; i++) g.set(8, i, bit(i));
+	g.set(8, 7, bit(6));
+	g.set(8, 8, bit(7));
+	g.set(7, 8, bit(8));
+	for (let i = 9; i < 15; i++) g.set(14 - i, 8, bit(i));
+	for (let i = 0; i < 8; i++) g.set(size - 1 - i, 8, bit(i));
+	for (let i = 8; i < 15; i++) g.set(8, size - 15 + i, bit(i));
+	g.set(8, size - 8, true);
+}
+function drawVersion(g) {
+	if (g.ver < 7) return;
+	let rem = g.ver;
+	for (let i = 0; i < 12; i++) rem = rem << 1 ^ (rem >>> 11) * 7973;
+	const bits = g.ver << 12 | rem;
+	for (let i = 0; i < 18; i++) {
+		const b = (bits >>> i & 1) !== 0;
+		const a = g.size - 11 + i % 3, c = Math.floor(i / 3);
+		g.set(a, c, b);
+		g.set(c, a, b);
+	}
+}
+function drawCodewords(g, codewords) {
+	const { size } = g;
+	let i = 0;
+	for (let right = size - 1; right >= 1; right -= 2) {
+		if (right === 6) right = 5;
+		for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+			const x = right - j;
+			const y = (right + 1 & 2) === 0 ? size - 1 - vert : vert;
+			if (!g.reserved[y][x] && i < codewords.length * 8) {
+				g.dark[y][x] = (codewords[i >>> 3] >>> 7 - (i & 7) & 1) !== 0;
+				i++;
+			}
+		}
+	}
+}
+var MASKS = [
+	(x, y) => (x + y) % 2 === 0,
+	(_x, y) => y % 2 === 0,
+	(x) => x % 3 === 0,
+	(x, y) => (x + y) % 3 === 0,
+	(x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0,
+	(x, y) => x * y % 2 + x * y % 3 === 0,
+	(x, y) => (x * y % 2 + x * y % 3) % 2 === 0,
+	(x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0
+];
+function applyMask(g, mask) {
+	const fn = MASKS[mask];
+	for (let y = 0; y < g.size; y++) for (let x = 0; x < g.size; x++) if (!g.reserved[y][x] && fn(x, y)) g.dark[y][x] = !g.dark[y][x];
+}
+/** Penalty rules 1, 2 and 4 of the standard (enough to pick a good mask). */
+function penalty(g) {
+	const { size, dark } = g;
+	let score = 0;
+	for (let pass = 0; pass < 2; pass++) for (let a = 0; a < size; a++) {
+		let run = 1;
+		for (let b = 1; b < size; b++) if ((pass ? dark[b][a] : dark[a][b]) === (pass ? dark[b - 1][a] : dark[a][b - 1])) {
+			run++;
+			if (run === 5) score += 3;
+			else if (run > 5) score++;
+		} else run = 1;
+	}
+	for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) {
+		const c = dark[y][x];
+		if (c === dark[y][x + 1] && c === dark[y + 1][x] && c === dark[y + 1][x + 1]) score += 3;
+	}
+	const darkCount = dark.reduce((a, row) => a + row.filter(Boolean).length, 0);
+	const total = size * size;
+	score += (Math.ceil(Math.abs(darkCount * 20 - total * 10) / total) - 1) * 10;
+	return score;
+}
+var QRTooLong = class extends Error {};
+function qrMatrix(text) {
+	const bytes = new TextEncoder().encode(text);
+	let ver = 1;
+	const need = (v) => 4 + (v <= 9 ? 8 : 16) + bytes.length * 8;
+	while (ver <= MAX_VERSION && need(ver) > dataCodewords(ver) * 8) ver++;
+	if (ver > MAX_VERSION) throw new QRTooLong(`Text too long for a QR code (${bytes.length} bytes)`);
+	const codewords = addEccAndInterleave(encodeData(bytes, ver), ver);
+	let best = null;
+	let bestScore = Infinity;
+	for (let mask = 0; mask < 8; mask++) {
+		const g = new Grid(ver);
+		drawFunctionPatterns(g);
+		drawCodewords(g, codewords);
+		applyMask(g, mask);
+		drawFormatBits(g, mask);
+		const s = penalty(g);
+		if (s < bestScore) {
+			best = g;
+			bestScore = s;
+		}
+	}
+	return best.dark;
+}
+/** An SVG path covering the dark modules, with a 4-module quiet zone. */
+function qrPath(matrix) {
+	const quiet = 4;
+	let path = "";
+	matrix.forEach((row, y) => {
+		for (let x = 0; x < row.length; x++) {
+			if (!row[x]) continue;
+			let w = 1;
+			while (x + w < row.length && row[x + w]) w++;
+			path += `M${x + quiet} ${y + quiet}h${w}v1h-${w}z`;
+			x += w - 1;
+		}
+	});
+	return {
+		path,
+		size: matrix.length + 8
+	};
+}
+//#endregion
 //#region src/ui/install.ts
 var deferred = null;
 /** Embedded previews (e.g. a hosted demo in an iframe) can't be installed. */
@@ -1810,18 +2238,6 @@ var listeners = /* @__PURE__ */ new Set();
 var notify = () => listeners.forEach((fn) => fn());
 function isStandalone() {
 	return window.matchMedia("(display-mode: standalone)").matches || window.matchMedia("(display-mode: window-controls-overlay)").matches || navigator.standalone === true;
-}
-function platform() {
-	if (deferred) return "prompt";
-	const ua = navigator.userAgent;
-	if (/iPhone|iPad|iPod/.test(ua) || /Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return "ios";
-	const safari = /Safari\//.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua);
-	if (/Macintosh/.test(ua) && safari) return "mac-safari";
-	return "other";
-}
-/** Whether our Install button has something useful to do in this browser. */
-function canOfferInstall() {
-	return !EMBEDDED && !isStandalone() && platform() !== "other";
 }
 function onInstallChange(fn) {
 	listeners.add(fn);
@@ -1841,50 +2257,139 @@ function initInstall() {
 	window.matchMedia("(display-mode: standalone)").addEventListener("change", notify);
 }
 async function install() {
-	const p = platform();
-	if (p === "prompt" && deferred) {
+	if (deferred) {
 		const ev = deferred;
 		deferred = null;
 		await ev.prompt();
 		const { outcome } = await ev.userChoice;
-		if (outcome === "dismissed") toast("No problem. The Install button stays in the Sync tab if you change your mind.");
+		if (outcome === "dismissed") toast("No problem. You can install it any time with Get the app.");
 		notify();
-		return;
+		return true;
 	}
-	showInstructions(p);
+	return false;
 }
+/** The header button is useful everywhere except inside the installed app. */
+var showGetApp = () => !isStandalone();
 function step(n, ...content) {
 	return h("li", null, h("span", {
 		class: "inst-n",
 		"aria-hidden": "true"
 	}, String(n)), h("span", null, ...content));
 }
-function shareGlyph() {
+function glyph(name, label) {
 	return h("span", {
 		class: "inst-glyph",
-		"aria-label": "Share"
-	}, icon("upload", 15));
+		role: "img",
+		"aria-label": label
+	}, icon(name, 15));
 }
-function showInstructions(p = platform()) {
-	const body = () => {
-		if (p === "ios") return h("div", { class: "install-steps" }, h("p", null, "On iPhone and iPad, apps are added from the Share menu."), h("ol", null, step(1, "Tap ", shareGlyph(), " Share. In Safari it’s in the toolbar; in Chrome it’s at the top right."), step(2, "Scroll down and tap ", h("strong", null, "Add to Home Screen"), "."), step(3, "If you see ", h("strong", null, "Open as Web App"), ", leave it on. Then tap ", h("strong", null, "Add"), ".")), h("p", { class: "hint" }, "Tally then opens full screen from its own icon and works offline."));
-		if (p === "mac-safari") return h("div", { class: "install-steps" }, h("ol", null, step(1, "In the menu bar, choose ", h("strong", null, "File → Add to Dock…"), "."), step(2, "Click ", h("strong", null, "Add"), ".")), h("p", { class: "hint" }, "Tally then opens in its own window from the Dock and works offline."));
-		return h("div", { class: "install-steps" }, h("p", null, "This browser doesn’t offer to install web apps directly. You have two options:"), h("ol", null, step(1, "Open Tally in ", h("strong", null, "Chrome"), ", ", h("strong", null, "Edge"), " or ", h("strong", null, "Safari"), " and use the Install button there."), step(2, "Or bookmark this page. Everything still works offline once it has loaded.")), h("p", { class: "hint" }, "In Chrome or Edge you can also use the install icon at the right end of the address bar."));
+function detectGuide() {
+	const ua = navigator.userAgent;
+	if (/iPhone|iPad|iPod/.test(ua) || /Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return "iphone";
+	if (/Android/.test(ua)) return "android";
+	return "computer";
+}
+function iphoneSteps() {
+	return h("div", { class: "install-steps" }, h("ol", null, step(1, "Open this site in ", h("strong", null, "Safari"), " (Chrome on iPhone works too)."), step(2, "Tap ", glyph("share", "Share"), " ", h("strong", null, "Share"), ". In Safari it’s in the bottom bar (on newer iPhones, tap ", h("strong", null, "•••"), " first). In Chrome it’s at the top right."), step(3, "Scroll down and tap ", glyph("plus", "Add"), " ", h("strong", null, "Add to Home Screen"), "."), step(4, "Leave ", h("strong", null, "Open as Web App"), " switched on if you see it, then tap ", h("strong", null, "Add"), ".")), h("p", { class: "hint" }, "Tally now has its own icon on your Home Screen. It opens full screen, works offline, and can send reminders."));
+}
+function androidSteps() {
+	return h("div", { class: "install-steps" }, h("ol", null, step(1, "Open this site in ", h("strong", null, "Chrome"), "."), step(2, "Tap ", glyph("ellipsis-vertical", "Menu"), " the ", h("strong", null, "menu"), " at the top right."), step(3, "Tap ", h("strong", null, "Add to home screen"), ", then ", h("strong", null, "Install"), ". (Some phones say ", h("strong", null, "Install app"), " straight away.)"), step(4, "Tap ", h("strong", null, "Install"), " again to confirm.")), h("p", { class: "hint" }, "Samsung Internet: tap the ☰ menu, then ", h("strong", null, "Add page to → Home screen"), ". Tally then opens from its own icon, works offline, and can send reminders."));
+}
+function computerSteps() {
+	const ua = navigator.userAgent;
+	const edge = /Edg\//.test(ua);
+	const firefox = /Firefox\//.test(ua);
+	if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua)) return h("div", { class: "install-steps" }, h("ol", null, step(1, "In the menu bar, choose ", h("strong", null, "File → Add to Dock…"), "."), step(2, "Click ", h("strong", null, "Add"), ".")), h("p", { class: "hint" }, "Tally then opens in its own window from the Dock and works offline."));
+	if (firefox) return h("div", { class: "install-steps" }, h("p", null, "Firefox on computers can’t install web apps. You can:"), h("ol", null, step(1, "Open this site in ", h("strong", null, "Chrome"), " or ", h("strong", null, "Edge"), " and use ", h("strong", null, "Get the app"), " there."), step(2, "Or bookmark it. Tally still works offline once it has loaded.")));
+	return h("div", { class: "install-steps" }, h("ol", null, step(1, "Look at the right end of the address bar for the ", h("strong", null, "install"), " icon (a screen with an arrow) and click it."), step(2, "No icon? Open the ", h("strong", null, "⋮"), " or ", h("strong", null, "…"), " menu and choose ", edge ? h("strong", null, "Apps → Install this site as an app") : h("strong", null, "Cast, save and share → Install page as app"), "."), step(3, "Click ", h("strong", null, "Install"), ".")), h("p", { class: "hint" }, "Tally then opens in its own window from your Start menu, dock or app list, and works offline."));
+}
+/** Where to point a phone: this page without the in-app route. */
+function siteURL() {
+	const u = new URL(location.href);
+	u.hash = "";
+	u.search = "";
+	return u.href;
+}
+function qrCard() {
+	const url = siteURL();
+	let art;
+	try {
+		const { path, size } = qrPath(qrMatrix(url));
+		art = svg("svg", {
+			viewBox: `0 0 ${size} ${size}`,
+			class: "qr",
+			role: "img",
+			"aria-label": `QR code for ${url}`,
+			"shape-rendering": "crispEdges"
+		}, svg("rect", {
+			width: size,
+			height: size,
+			fill: "#fff"
+		}), svg("path", {
+			d: path,
+			fill: "#101820"
+		}));
+	} catch {
+		art = h("p", { class: "hint" }, "This address is too long for a QR code.");
+	}
+	return h("div", { class: "qr-card" }, art, h("div", null, h("p", { class: "strong" }, "On your phone"), h("p", { class: "hint" }, "Point your phone’s camera at the code and tap the link. Then follow the steps for your phone."), h("p", { class: "qr-url" }, url), button("Copy link", () => void copyText(url, "Link copied. Send it to your phone."), {
+		small: true,
+		icon: "copy",
+		variant: "quiet"
+	})));
+}
+/**
+* "Get the app": install on this device when the browser allows it, a QR code
+* to open the site on a phone, and step-by-step guides for iPhone, Android
+* and computers.
+*/
+function openGetApp(initial = detectGuide()) {
+	let guide = initial;
+	const onPhone = initial !== "computer";
+	const steps = h("div", { class: "guide" });
+	const tabs = h("div");
+	const render = () => {
+		tabs.replaceChildren(segmented("Show steps for", [
+			{
+				value: "iphone",
+				label: "iPhone / iPad",
+				icon: "smartphone"
+			},
+			{
+				value: "android",
+				label: "Android",
+				icon: "smartphone"
+			},
+			{
+				value: "computer",
+				label: "Computer",
+				icon: "monitor"
+			}
+		], guide, (v) => {
+			guide = v;
+			render();
+		}));
+		steps.replaceChildren(guide === "iphone" ? iphoneSteps() : guide === "android" ? androidSteps() : computerSteps());
 	};
+	render();
+	const installNow = deferred ? h("div", { class: "install-now" }, h("div", null, h("p", { class: "strong" }, "Install on this device"), h("p", { class: "hint" }, "One click. Tally gets its own icon and window, and works offline.")), button("Install Tally", async () => {
+		document.querySelectorAll("dialog.dialog").forEach((d) => d.close());
+		await install();
+	}, {
+		variant: "primary",
+		icon: "download",
+		key: "install-now"
+	})) : null;
 	openDialog({
-		title: "Install Tally",
-		body,
-		submitLabel: "Got it",
+		title: "Get the Tally app",
+		submitLabel: "Done",
+		infoOnly: true,
 		onSubmit: () => {},
-		infoOnly: true
+		body: () => h("div", { class: "get-app" }, h("p", { class: "lede" }, "Tally is a web app: no app store needed. Add it to your phone or computer and it opens from its own icon, works offline, and keeps your data on that device."), EMBEDDED ? h("p", { class: "note-box" }, icon("info", 16), " This is a preview inside another page, so it can’t be installed from here. Open your published Tally site to install it.") : null, installNow, onPhone ? null : qrCard(), tabs, steps)
 	});
 }
-/** A card for the Sync tab: always explains, even where the top-bar button is hidden. */
+/** A card for the Sync tab. */
 function installCard() {
-	if (EMBEDDED) return h("div", { class: "card install-card" }, h("div", {
-		class: "install-art",
-		"aria-hidden": "true"
-	}, icon("download", 28)), h("div", null, h("h3", null, "Use Tally as an app"), h("p", { class: "hint" }, "This is an embedded preview, so it can’t be installed from here. Open the deployed site (for example, your GitHub Pages address) and use Install app there.")));
 	const standalone = isStandalone();
 	return h("div", { class: "card install-card" }, h("div", {
 		class: "install-art",
@@ -1894,9 +2399,9 @@ function installCard() {
 		alt: "",
 		width: 56,
 		height: 56
-	})), h("div", null, h("h3", null, standalone ? "You’re using the app" : "Use Tally as an app"), h("p", { class: "hint" }, standalone ? "Tally is installed on this device. It opens from its own icon, works offline, and shows a badge for renewals due in the next 3 days." : "Install it to open Tally from your home screen or dock, use it offline, open bank CSVs with it, and see a badge when renewals are due.")), standalone ? null : button(deferred ? "Install" : "How to install", () => void install(), {
+	})), h("div", null, h("h3", null, standalone ? "You’re using the app" : "Get the app on your phone or computer"), h("p", { class: "hint" }, standalone ? "Tally is installed on this device. It opens from its own icon, works offline, and shows a badge for renewals due in the next 3 days." : "Add Tally to your home screen or dock: it opens from its own icon, works offline, and can remind you before renewals. Includes a QR code to open it on your phone.")), standalone ? null : button("Get the app", () => openGetApp(), {
 		variant: "primary",
-		icon: "download",
+		icon: "smartphone",
 		key: "install-card"
 	}));
 }
@@ -2261,12 +2766,13 @@ var ARTICLES = [
 			"what is this"
 		],
 		summary: "Tally keeps track of the money that repeats: subscriptions you pay for, costs you share with friends, and a shopping list that shows the real total with tax.",
-		body: `Tally has five main sections:
+		body: `Tally has six main sections:
 
 - **Subscriptions**: everything you pay for on a schedule, what it costs per month and year, when it next charges, and which ones deserve a second look.
 - **Split**: shared costs with friends or housemates, split fairly, and the fewest payments needed to settle up.
 - **Cart**: a shopping list that adds sales tax and warns you before you go over budget.
 - **Budget**: monthly budgets per category, savings goals, charts of where your money goes, and receipt scanning.
+- **Alternatives**: AI suggestions for cheaper or better alternatives to what you pay for, with a shortlist.
 - **Sync**: optional. Saves your subscriptions to your own GitHub repository and sends renewal alerts.
 
 Everything is saved in this browser. Nothing is uploaded unless you use Sync or share a link.`
@@ -2325,8 +2831,8 @@ You can also use the **undo arrow** at the top right, or press **U** on a keyboa
 			"keyboard",
 			"faster"
 		],
-		summary: "Press 1–6 to switch sections, N to add something, H to ask the help desk, U to undo, T to change the theme, and ? to see the list.",
-		body: `- **1–6**: switch between Subscriptions, Split, Cart, Budget, Sync and Help
+		summary: "Press 1–7 to switch sections, N to add something, H to ask the help desk, U to undo, T to change the theme, and ? to see the list.",
+		body: `- **1–7**: switch between Subscriptions, Split, Cart, Budget, Alternatives, Sync and Help
 - **N**: add a subscription, log an expense or spending, or jump to the cart's add row
 - **H**: ask the help desk
 - **U**: undo the last change
@@ -2969,6 +3475,40 @@ Tally doesn't move real money. Goals are a plan you keep up to date.`,
 		}
 	},
 	{
+		id: "alternatives",
+		section: "Budget",
+		title: "Find cheaper or better alternatives",
+		keywords: [
+			"alternatives",
+			"cheaper",
+			"cut costs",
+			"save money",
+			"switch",
+			"replace",
+			"better quality",
+			"best value",
+			"deal",
+			"competitor",
+			"swap",
+			"shortlist",
+			"downgrade",
+			"upgrade"
+		],
+		summary: "Open Alternatives, pick one of your subscriptions (or type anything you pay for), choose Cheaper, Better quality or Best value, and click Find alternatives. Save the ideas you like to your shortlist; nothing changes until you choose \"I switched\".",
+		body: `1. Open **Alternatives** (or click the ⇄ button on a subscription's row).
+2. Pick **one of your subscriptions**, or choose **Something else** and type it (a phone plan, insurance, a gym…). The price is optional.
+3. Choose what you're after: **Cheaper**, **Better quality** or **Best value**. Add anything that matters (for example "need 4K" or "I'm a student") and where you live.
+4. Click **Find alternatives**. Each suggestion shows a rough price, what you'd gain, what you'd give up, and how much it could save a year.
+5. **Save to shortlist** the ones you like, and use **Look it up** to check the real price.
+6. When you actually switch, click **I switched** on the shortlist. Tally updates the subscription's name and price and keeps the old price in its history. Remember to cancel the old one with the company.
+
+Suggestions come from the AI you set up in **Help → AI settings**; without one you still get **Ways to pay less** ideas that work offline. AI prices can be out of date, so always check before switching. This isn't financial advice.`,
+		link: {
+			label: "Open Alternatives",
+			href: "#/alternatives"
+		}
+	},
+	{
 		id: "sync-overview",
 		section: "Sync & alerts",
 		title: "What Sync does (and whether you need it)",
@@ -3013,7 +3553,7 @@ Only **subscriptions** are synced. Your split group and cart stay on this device
 		body: `1. On GitHub, open the Tally project and click **Use this template → Create a new repository**. Make it **Private**.
 2. In the new repo, open **Settings → General → Features** and make sure **Issues** is on. Open the **Actions** tab and enable workflows if asked.
 3. Create a token: GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**. Under *Repository access* choose **Only select repositories** and pick your new repo. Under *Permissions → Repository permissions*, set **Contents** to **Read and write**.
-4. In Tally's **Sync** tab, enter the **Owner** (your GitHub username), the **Repository** name, and paste the **token**.
+4. In Tally's **Sync** tab, open **Email alerts before renewals**, enter the **Owner** (your GitHub **username**, not your email) and the **Repository** name, and paste the **token**. Tip: paste your repository's address (github.com/owner/repository) into either box and Tally fills in both.
 5. Optional but recommended: tick **Encrypt the file with a passphrase**.
 6. Click **Commit to GitHub**.
 
@@ -3100,15 +3640,21 @@ This replaces the subscriptions on that device with the repo copy. To move *ever
 			"add to dock",
 			"download app",
 			"iphone",
-			"android"
+			"android",
+			"phone",
+			"get the app",
+			"qr code",
+			"webapp",
+			"web app"
 		],
-		summary: "Click \"Install app\" at the top (Chrome, Edge, Android). On iPhone or iPad, tap Share → Add to Home Screen. On a Mac in Safari, choose File → Add to Dock.",
-		body: `Installed, Tally opens from its own icon, works **offline**, shows a **badge** with renewals due in the next 3 days, and can send **reminders**.
+		summary: "Click \"Get the app\" at the top. It installs Tally on this device where the browser allows, shows a QR code to open Tally on your phone, and has steps for iPhone, Android and computers.",
+		body: `Click **Get the app** at the top of any page (or in the Sync tab). Installed, Tally opens from its own icon, works **offline**, shows a **badge** with renewals due in the next 3 days, and can send **reminders**. No app store is needed.
 
-- **Chrome, Edge, Android**: click **Install app** at the top, or the install icon in the address bar.
-- **iPhone / iPad**: tap **Share**, then **Add to Home Screen**.
-- **Safari on Mac**: **File → Add to Dock**.
-- **Firefox (desktop)**: can't install web apps; bookmark it instead.
+- **On a computer**: click **Install Tally** if it appears. Otherwise use the install icon at the right of the address bar, or the browser menu. In Safari on a Mac: **File → Add to Dock**.
+- **To put it on your phone**: point your phone's camera at the **QR code** in Get the app and tap the link.
+- **iPhone / iPad**: tap **Share** (on newer iPhones, tap **•••** first), then **Add to Home Screen**, then **Add**.
+- **Android**: in Chrome, tap the **⋮** menu, then **Add to home screen** → **Install**.
+- **Firefox (desktop)**: can't install web apps; use Chrome or Edge, or bookmark it.
 
 Your data stays the same whether you use the app or the website on the same browser.`
 	},
@@ -3675,7 +4221,7 @@ var AIError = class extends Error {
 	}
 };
 var MAX_TOKENS = 900;
-function geminiRequest(key, model, system, messages) {
+function geminiRequest(key, model, system, messages, maxTokens = MAX_TOKENS) {
 	return {
 		url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
 		headers: {
@@ -3690,12 +4236,12 @@ function geminiRequest(key, model, system, messages) {
 			})),
 			generationConfig: {
 				temperature: .3,
-				maxOutputTokens: MAX_TOKENS
+				maxOutputTokens: maxTokens
 			}
 		})
 	};
 }
-function anthropicRequest(key, model, system, messages) {
+function anthropicRequest(key, model, system, messages, maxTokens = MAX_TOKENS) {
 	return {
 		url: "https://api.anthropic.com/v1/messages",
 		headers: {
@@ -3706,7 +4252,7 @@ function anthropicRequest(key, model, system, messages) {
 		},
 		body: JSON.stringify({
 			model,
-			max_tokens: MAX_TOKENS,
+			max_tokens: maxTokens,
 			system,
 			messages,
 			stream: true
@@ -3844,7 +4390,7 @@ async function resolveProvider(cfg) {
 }
 async function streamAnswer(o) {
 	if (o.provider === "builtin") return streamBuiltin(o);
-	const req = o.provider === "gemini" ? geminiRequest(o.cfg.keys.gemini.trim(), o.cfg.models.gemini || DEFAULT_MODELS.gemini, o.system, o.messages) : o.provider === "anthropic" ? anthropicRequest(o.cfg.keys.anthropic.trim(), o.cfg.models.anthropic || DEFAULT_MODELS.anthropic, o.system, o.messages) : o.provider === "openai" ? openaiRequest(o.cfg.openaiBaseUrl, o.cfg.keys.openai?.trim() ?? "", o.cfg.models.openai || DEFAULT_MODELS.openai, o.system, o.messages) : proxyRequest(o.proxyUrl ?? void 0, o.system, o.messages);
+	const req = o.provider === "gemini" ? geminiRequest(o.cfg.keys.gemini.trim(), o.cfg.models.gemini || DEFAULT_MODELS.gemini, o.system, o.messages, o.maxTokens) : o.provider === "anthropic" ? anthropicRequest(o.cfg.keys.anthropic.trim(), o.cfg.models.anthropic || DEFAULT_MODELS.anthropic, o.system, o.messages, o.maxTokens) : o.provider === "openai" ? openaiRequest(o.cfg.openaiBaseUrl, o.cfg.keys.openai?.trim() ?? "", o.cfg.models.openai || DEFAULT_MODELS.openai, o.system, o.messages) : proxyRequest(o.proxyUrl ?? void 0, o.system, o.messages);
 	let res;
 	try {
 		res = await (o.fetchImpl ?? fetch)(req.url, {
@@ -4442,7 +4988,7 @@ How to answer:
 - Plain, friendly language. Short: under 120 words unless step-by-step instructions are needed.
 - For how-to questions, give numbered steps and name buttons and fields exactly as they appear in the reference, in **bold**.
 - For "what does X mean" questions, give a one-sentence definition, then a small example with numbers.
-- Link to a section of the app when helpful, using these exact links: [Subscriptions](#/subscriptions), [Split](#/split), [Cart](#/cart), [Budget](#/budget), [Sync](#/sync), [Help](#/help).
+- Link to a section of the app when helpful, using these exact links: [Subscriptions](#/subscriptions), [Split](#/split), [Cart](#/cart), [Budget](#/budget), [Alternatives](#/alternatives), [Sync](#/sync), [Help](#/help).
 - Only describe Tally features that appear in the reference. If the reference doesn't cover something, say you're not sure Tally does that and suggest checking the Help articles. Never invent buttons, settings or features.
 - You may explain general money ideas (sales tax, free trials, splitting costs, exchange rates). Do not give personal investment, tax or legal advice; for those, suggest a qualified professional.
 - Never ask for passwords, API keys, GitHub tokens or passphrases, and tell the person not to paste them into the chat.
@@ -4501,6 +5047,7 @@ function describeScreen(hash) {
 		split: "the Split tab (shared expenses, balances and settle up)",
 		cart: "the Cart tab (shopping list with sales tax and budget)",
 		budget: "the Budget tab (monthly budgets, savings goals, spending insights, receipt scanning)",
+		alternatives: "the Alternatives tab (AI suggestions for cheaper or better alternatives, and a shortlist)",
 		sync: "the Sync tab (GitHub sync, encryption, backups, reminders and preferences)",
 		help: "the Help tab",
 		shared: "a read-only shared split link"
@@ -5373,7 +5920,7 @@ function parseLooseDate(s) {
 	}
 	return null;
 }
-var find = (header, ...patterns) => header.findIndex((h) => patterns.some((p) => p.test(h)));
+var find$1 = (header, ...patterns) => header.findIndex((h) => patterns.some((p) => p.test(h)));
 /**
 * Pull outgoing transactions from a bank/card export. Column names vary
 * wildly between banks, so we match on common header words and support both
@@ -5382,10 +5929,10 @@ var find = (header, ...patterns) => header.findIndex((h) => patterns.some((p) =>
 function extractTransactions(rows, currency = "USD") {
 	if (rows.length < 2) return [];
 	const header = rows[0].map((h) => h.trim().toLowerCase());
-	const iDate = find(header, /^(transaction |posting |post )?date$/, /date/);
-	const iDesc = find(header, /desc/, /merchant/, /payee/, /name/, /memo/, /details/);
-	const iAmount = find(header, /^amount$/, /amount/);
-	const iDebit = find(header, /debit/, /withdraw/, /out/);
+	const iDate = find$1(header, /^(transaction |posting |post )?date$/, /date/);
+	const iDesc = find$1(header, /desc/, /merchant/, /payee/, /name/, /memo/, /details/);
+	const iAmount = find$1(header, /^amount$/, /amount/);
+	const iDebit = find$1(header, /debit/, /withdraw/, /out/);
 	if (iDate < 0 || iDesc < 0 || iAmount < 0 && iDebit < 0) throw new Error("Could not find date, description and amount columns in this CSV.");
 	const raw = rows.slice(1).flatMap((r) => {
 		const date = parseLooseDate(r[iDate] ?? "");
@@ -7065,7 +7612,7 @@ var LOBES = {
 	quarterly: 8,
 	annual: 5
 };
-var CYCLE_LABEL = {
+var CYCLE_LABEL$1 = {
 	weekly: "week",
 	monthly: "month",
 	quarterly: "quarter",
@@ -7208,7 +7755,7 @@ function subscriptionsView(ctx) {
 		return h("tr", { class: [paused && "is-paused", whatIf.has(s.id) && "is-whatif"] }, h("td", { "data-label": "Service" }, h("div", { class: "svc" }, h("span", { class: "svc-name" }, s.name), h("span", { class: "svc-meta" }, s.category, s.status === "trial" ? h("span", { class: "tag tag-trial" }, trial !== null && trial >= 0 ? `Trial · ${trial}d left` : "Trial") : null, paused ? h("span", { class: "tag" }, "Paused") : null))), h("td", {
 			class: "r",
 			"data-label": "Price"
-		}, h("span", { class: "num strong" }, money(s.amount)), h("span", { class: "svc-meta" }, `/${CYCLE_LABEL[s.cycle]}`, s.cycle !== "monthly" ? ` · ${money(monthlyCost(s))}/mo` : "")), h("td", { "data-label": "Next charge" }, paused ? h("span", { class: "muted" }, "—") : [h("span", { class: "num" }, formatDate(next)), h("span", { class: ["svc-meta", days <= s.leadDays && "warn-text"] }, relativeDays(days))]), h("td", { "data-label": "Use" }, h("span", null, USAGE_LABEL[s.usage]), cpu !== null && !paused ? h("span", { class: "svc-meta" }, `≈ ${money(cpu)}/use`) : null), h("td", { "data-label": "Review" }, flags.length ? h("div", { class: "flags" }, flags.map((f) => h("span", {
+		}, h("span", { class: "num strong" }, money(s.amount)), h("span", { class: "svc-meta" }, `/${CYCLE_LABEL$1[s.cycle]}`, s.cycle !== "monthly" ? ` · ${money(monthlyCost(s))}/mo` : "")), h("td", { "data-label": "Next charge" }, paused ? h("span", { class: "muted" }, "—") : [h("span", { class: "num" }, formatDate(next)), h("span", { class: ["svc-meta", days <= s.leadDays && "warn-text"] }, relativeDays(days))]), h("td", { "data-label": "Use" }, h("span", null, USAGE_LABEL[s.usage]), cpu !== null && !paused ? h("span", { class: "svc-meta" }, `≈ ${money(cpu)}/use`) : null), h("td", { "data-label": "Review" }, flags.length ? h("div", { class: "flags" }, flags.map((f) => h("span", {
 			class: `flag sev-${f.severity}`,
 			title: f.detail
 		}, f.label))) : h("span", { class: "muted" }, paused ? "" : "Looks fine"), !paused ? h("label", { class: "whatif" }, h("input", {
@@ -7222,6 +7769,13 @@ function subscriptionsView(ctx) {
 		}), "What if I cancel?") : null), h("td", { class: "r actions" }, button("", () => editSubscription(ctx, s), {
 			icon: "pencil",
 			title: `Edit ${s.name}`,
+			variant: "quiet",
+			small: true
+		}), button("", () => {
+			location.hash = `/alternatives/${s.id}`;
+		}, {
+			icon: "arrow-right-left",
+			title: `Find alternatives to ${s.name}`,
 			variant: "quiet",
 			small: true
 		}), button("", () => {
@@ -7424,7 +7978,7 @@ function subscriptionsView(ctx) {
 					e.target.checked ? importPicked.add(c.name) : importPicked.delete(c.name);
 					ctx.rerender();
 				}
-			})), h("td", null, c.name, known ? h("span", { class: "svc-meta" }, "Already tracked") : h("span", { class: "svc-meta" }, `${c.occurrences} charges seen`)), h("td", { class: "r" }, h("span", { class: "num" }, money(c.amount)), c.previousAmount !== void 0 ? h("span", { class: ["svc-meta", c.amount > c.previousAmount && "warn-text"] }, `${c.amount > c.previousAmount ? "up" : "down"} from ${money(c.previousAmount)}`) : null), h("td", null, CYCLE_LABEL[c.cycle]), h("td", { class: "num" }, formatDate(nextOccurrence(c.nextExpected, c.cycle, today))), h("td", null, h("span", {
+			})), h("td", null, c.name, known ? h("span", { class: "svc-meta" }, "Already tracked") : h("span", { class: "svc-meta" }, `${c.occurrences} charges seen`)), h("td", { class: "r" }, h("span", { class: "num" }, money(c.amount)), c.previousAmount !== void 0 ? h("span", { class: ["svc-meta", c.amount > c.previousAmount && "warn-text"] }, `${c.amount > c.previousAmount ? "up" : "down"} from ${money(c.previousAmount)}`) : null), h("td", null, CYCLE_LABEL$1[c.cycle]), h("td", { class: "num" }, formatDate(nextOccurrence(c.nextExpected, c.cycle, today))), h("td", null, h("span", {
 				class: "meter",
 				style: { "--v": String(c.confidence) },
 				title: `${Math.round(c.confidence * 100)}%`
@@ -7523,7 +8077,7 @@ function editSubscription(ctx, existing) {
 				inputMode: "decimal",
 				value: existing ? toInputValue(s.amount, cur) : "",
 				placeholder: "15.49"
-			})), field("Billed every", h("select", { name: "cycle" }, CYCLES.map((c) => opt(c, CYCLE_LABEL[c], s.cycle))))), h("div", { class: "pair" }, field("Next charge", h("input", {
+			})), field("Billed every", h("select", { name: "cycle" }, CYCLES.map((c) => opt(c, CYCLE_LABEL$1[c], s.cycle))))), h("div", { class: "pair" }, field("Next charge", h("input", {
 				type: "date",
 				name: "anchor",
 				required: true,
@@ -7660,6 +8214,57 @@ async function commitFile(target, token, content, message, fetchImpl = fetch) {
 	});
 	if (!res.ok) throw new GitHubError(explain(res.status, `GitHub returned ${res.status}`), res.status);
 	return (await res.json()).commit?.html_url ?? `https://github.com/${target.owner}/${target.repo}`;
+}
+/** GitHub usernames and org names: letters, digits and single hyphens, up to 39. */
+var OWNER_RE = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+var REPO_RE = /^[\w.-]{1,100}$/;
+/** A plain-language problem with the Owner field, or null if it looks right. */
+function ownerProblem(owner) {
+	const v = owner.trim();
+	if (!v) return null;
+	if (v.includes("@")) return "That’s an email address. Owner is your GitHub username (the name in your github.com address), not your email.";
+	if (/\s/.test(v)) return "A GitHub username has no spaces.";
+	if (!OWNER_RE.test(v)) return "A GitHub username has only letters, numbers and single hyphens.";
+	return null;
+}
+function repoProblem(repo) {
+	const v = repo.trim();
+	if (!v) return null;
+	if (/\s/.test(v)) return "A repository name has no spaces. GitHub turns spaces into hyphens (my-tally).";
+	if (!REPO_RE.test(v)) return "A repository name has only letters, numbers, hyphens, underscores and dots.";
+	return null;
+}
+/**
+* Accept a pasted GitHub address in either field:
+* "https://github.com/finpathdev/Tally", "github.com/finpathdev/Tally.git",
+* "finpathdev/Tally" or "https://finpathdev.github.io/Tally/".
+*/
+function parseRepoAddress(input) {
+	const v = input.trim().replace(/\/+$/, "").replace(/\.git$/, "");
+	let m = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/\s]+)\/([^/\s?#]+)/i.exec(v);
+	if (m) return {
+		owner: m[1],
+		repo: m[2]
+	};
+	m = /^(?:https?:\/\/)?([a-z\d-]+)\.github\.io(?:\/([^/\s?#]+))?/i.exec(v);
+	if (m) return {
+		owner: m[1],
+		repo: m[2] ?? `${m[1]}.github.io`
+	};
+	m = /^([a-z\d-]+)\/([\w.-]+)$/i.exec(v);
+	if (m && !v.includes("@")) return {
+		owner: m[1],
+		repo: m[2]
+	};
+	return null;
+}
+/** Whether the repo is public. Returns null if GitHub won't say (e.g. no access). */
+async function isPublicRepo(target, token, fetchImpl = fetch) {
+	const res = await fetchImpl(`https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`, { headers: headersFor(token) });
+	if (!res.ok) return null;
+	const json = await res.json();
+	if (typeof json.private !== "boolean") return null;
+	return !json.private;
 }
 //#endregion
 //#region src/lib/report.ts
@@ -7854,14 +8459,93 @@ function alertsWorkflowLink() {
 	const first = location.pathname.split("/").filter(Boolean)[0];
 	return `https://github.com/${owner}/${first && !first.includes(".") ? first : `${owner}.github.io`}/new/main?filename=${encodeURIComponent(".github/workflows/renewal-alerts.yml")}&value=${encodeURIComponent(renewal_alerts_default)}`;
 }
+/** On a github.io site, the repository the site itself is published from. */
+function siteRepo() {
+	return /\.github\.io$/i.test(location.hostname) ? parseRepoAddress(location.href) : null;
+}
+/** Whether the alerts setup section starts open. */
+var setupOpen = null;
 function syncView(ctx) {
 	const { state, today } = ctx;
 	const due = dueForAlert(state.subscriptions, today);
-	const cfg = state.sync;
+	const site = siteRepo();
+	if (site && !state.sync.repo && (!state.sync.owner || ownerProblem(state.sync.owner))) store.patch((d) => {
+		d.sync.owner = site.owner;
+		d.sync.repo = site.repo;
+		d.sync.encrypt = true;
+	});
+	const cfg = store.state.sync;
+	const problems = () => {
+		const c = store.state.sync;
+		return ownerProblem(c.owner) ?? repoProblem(c.repo);
+	};
 	const isReady = () => {
 		const c = store.state.sync;
 		return Boolean(c.owner && c.repo && c.branch && c.path);
 	};
+	setupOpen ??= Boolean(cfg.owner && cfg.repo && token);
+	const ownerMsg = h("p", {
+		class: "field-error",
+		role: "alert",
+		id: "gh-owner-err"
+	}, ownerProblem(cfg.owner) ?? "");
+	const repoMsg = h("p", {
+		class: "field-error",
+		role: "alert",
+		id: "gh-repo-err"
+	}, repoProblem(cfg.repo) ?? "");
+	const ownerInput = h("input", {
+		value: cfg.owner,
+		placeholder: "your-github-username",
+		dataset: {
+			key: "gh-owner",
+			lpignore: "true",
+			"1pIgnore": "true",
+			formType: "other"
+		},
+		name: "gh-repo-owner",
+		autocomplete: "off",
+		"aria-describedby": "gh-owner-err",
+		spellcheck: false
+	});
+	const repoInput = h("input", {
+		value: cfg.repo,
+		placeholder: "my-tally",
+		dataset: {
+			key: "gh-repo",
+			lpignore: "true",
+			"1pIgnore": "true",
+			formType: "other"
+		},
+		name: "gh-repo-name",
+		autocomplete: "off",
+		"aria-describedby": "gh-repo-err",
+		spellcheck: false
+	});
+	const showProblems = () => {
+		const o = ownerProblem(ownerInput.value);
+		const r = repoProblem(repoInput.value);
+		ownerMsg.textContent = o ?? "";
+		repoMsg.textContent = r ?? "";
+		ownerInput.setAttribute("aria-invalid", String(!!o));
+		repoInput.setAttribute("aria-invalid", String(!!r));
+	};
+	const onRepoField = (e) => {
+		const input = e.target;
+		const addr = parseRepoAddress(input.value);
+		if (addr) {
+			ownerInput.value = addr.owner;
+			repoInput.value = addr.repo;
+		}
+		store.patch((d) => {
+			d.sync.owner = ownerInput.value.trim();
+			d.sync.repo = repoInput.value.trim();
+		});
+		showProblems();
+	};
+	ownerInput.addEventListener("input", onRepoField);
+	repoInput.addEventListener("input", onRepoField);
+	showProblems();
 	const saveCfg = (key) => (e) => {
 		const v = e.target.value.trim();
 		store.patch((d) => {
@@ -7874,11 +8558,20 @@ function syncView(ctx) {
 	}, h("div", { class: "toolbar" }, h("h2", {
 		id: "sync-title",
 		class: "section-title"
-	}, "Sync & alerts"), h("p", { class: "muted" }, "Keep your subscriptions in a GitHub repo and get an issue, and an email, before anything renews.")), installCard(), h("ol", { class: "steps" }, h("li", { class: "card step" }, ...(() => {
+	}, "Sync & alerts"), h("p", { class: "muted" }, "Get the app, back up your data, and (optionally) email alerts before renewals.")), installCard(), h("details", {
+		class: "card alerts-setup",
+		open: setupOpen,
+		onToggle: (e) => {
+			setupOpen = e.target.open;
+		}
+	}, h("summary", null, h("span", {
+		class: "alerts-icon",
+		"aria-hidden": "true"
+	}, icon("bell-ring", 20)), h("span", null, h("span", { class: "alerts-title" }, "Email alerts before renewals"), h("span", { class: "tag" }, "Optional"), h("span", { class: "hint alerts-sub" }, "Tally works without this. Set it up if you want GitHub to email you a few days before each subscription renews, or to use your subscriptions on another device. Takes about 5 minutes and needs a free GitHub account."))), h("ol", { class: "steps" }, h("li", { class: "card step" }, ...(() => {
 		const link = alertsWorkflowLink();
 		return [
 			h("h3", null, "Add the alerts workflow to your repository"),
-			h("p", null, "Email alerts run on GitHub. They need ", h("code", null, "tally-renewal-check.mjs"), " (already uploaded with the site) and one workflow file. Keep the repository ", h("strong", null, "private"), " if you don’t encrypt: it will hold your subscription list."),
+			h("p", null, "Alerts run on GitHub, in the repository this site is published from. They need ", h("code", null, "tally-renewal-check.mjs"), " (already uploaded with the site) and one workflow file. This repository is usually public, so leave ", h("strong", null, "encryption"), " on in step 2: your subscription list is then stored scrambled."),
 			link ? h("a", {
 				class: "btn btn-ghost",
 				href: link,
@@ -7887,19 +8580,7 @@ function syncView(ctx) {
 			}, icon("git-branch", 17), h("span", null, "Create the alerts workflow")) : h("p", { class: "hint" }, "On github.com, choose Add file → Create new file, name it .github/workflows/renewal-alerts.yml, and paste the workflow from the README."),
 			h("p", { class: "hint" }, "The link opens the file pre-filled on GitHub; click Commit changes. Then turn on Issues in Settings → General → Features.")
 		];
-	})()), h("li", { class: "card step" }, h("h3", null, "Send your subscriptions to it"), h("div", { class: "grid-form cols-4" }, field("Owner", h("input", {
-		value: cfg.owner,
-		placeholder: "your-username",
-		onInput: saveCfg("owner"),
-		dataset: { key: "gh-owner" },
-		autocomplete: "off"
-	})), field("Repository", h("input", {
-		value: cfg.repo,
-		placeholder: "my-tally",
-		onInput: saveCfg("repo"),
-		dataset: { key: "gh-repo" },
-		autocomplete: "off"
-	})), field("Branch", h("input", {
+	})()), h("li", { class: "card step" }, h("h3", null, "Send your subscriptions to it"), h("p", { class: "hint" }, "Owner and Repository are the two parts of your repository’s address: github.com/", h("strong", null, "owner"), "/", h("strong", null, "repository"), ". You can paste the whole address into either box."), h("div", { class: "grid-form pair repo-fields" }, h("div", null, field("Owner (GitHub username)", ownerInput), ownerMsg), h("div", null, field("Repository", repoInput), repoMsg)), h("details", { class: "advanced" }, h("summary", null, "Advanced: branch and file name"), h("div", { class: "grid-form pair" }, field("Branch", h("input", {
 		value: cfg.branch,
 		onInput: saveCfg("branch"),
 		dataset: { key: "gh-branch" }
@@ -7907,12 +8588,16 @@ function syncView(ctx) {
 		value: cfg.path,
 		onInput: saveCfg("path"),
 		dataset: { key: "gh-path" }
-	}))), field("Fine-grained access token", h("input", {
+	})))), field("Fine-grained access token", h("input", {
 		type: "password",
 		value: token,
 		placeholder: "github_pat_…",
-		autocomplete: "off",
-		dataset: { key: "gh-token" },
+		autocomplete: "new-password",
+		dataset: {
+			key: "gh-token",
+			lpignore: "true",
+			"1pIgnore": "true"
+		},
 		onInput: (e) => {
 			token = e.target.value.trim();
 			if (remember) try {
@@ -7951,12 +8636,24 @@ function syncView(ctx) {
 	}), "Only encrypted data is stored in the repo (AES-256-GCM). Tally never saves this passphrase, and nobody can recover it for you, so keep it in your password manager."), h("p", { class: "hint" }, "For alerts, add the same passphrase as a repository secret named ", h("code", null, "TALLY_PASSPHRASE"), " (Settings → Secrets and variables → Actions). Alert issues then say when something renews, not what.")) : h("p", { class: "hint" }, "Recommended even for private repos: anyone with access to the repo, or to a leaked token, sees only scrambled data.")), h("div", { class: "row wrap" }, button(busy === "commit" ? store.state.sync.encrypt ? "Encrypting…" : "Committing…" : "Commit to GitHub", async () => {
 		if (busy) return;
 		if (!isReady()) return toast("Fill in owner, repository, branch and file first.");
+		const problem = problems();
+		if (problem) return toast(problem, void 0, 8e3);
 		if (!token) return toast("Paste a fine-grained access token first.");
 		const passErr = needPassphrase(store.state);
 		if (passErr) return toast(passErr);
 		busy = "commit";
 		ctx.rerender();
 		try {
+			if (!store.state.sync.encrypt && await isPublicRepo(store.state.sync, token).catch(() => null)) {
+				if (await confirmDialog("This repository is public", `Anyone can see the files in ${store.state.sync.owner}/${store.state.sync.repo}, so your subscription list would be public too. Turn on encryption and choose a passphrase, or use a private repository instead.`, "Turn on encryption")) {
+					setupOpen = true;
+					store.update(null, (d) => {
+						d.sync.encrypt = true;
+					});
+					requestAnimationFrame(() => document.querySelector("[data-key=gh-pass]")?.focus());
+				}
+				return;
+			}
 			const text = await repoFileText(store.state);
 			const url = await commitFile(store.state.sync, token, text, store.state.sync.encrypt ? "Update subscriptions (encrypted)" : `Update subscriptions (${state.subscriptions.length})`);
 			toast("Committed to GitHub", {
@@ -7976,6 +8673,8 @@ function syncView(ctx) {
 	}), button(busy === "pull" ? "Pulling…" : "Pull from GitHub", async () => {
 		if (busy) return;
 		if (!isReady()) return toast("Fill in owner, repository, branch and file first.");
+		const problem = problems();
+		if (problem) return toast(problem, void 0, 8e3);
 		if (!token) return toast("Paste a fine-grained access token first.");
 		busy = "pull";
 		ctx.rerender();
@@ -8015,7 +8714,7 @@ function syncView(ctx) {
 		const passErr = needPassphrase(store.state);
 		if (passErr) return toast(passErr);
 		download("subscriptions.json", await repoFileText(store.state));
-	}, { icon: "download" }))), h("li", { class: "card step" }, h("h3", null, "Get alerts"), h("p", null, "Every morning the ", h("code", null, "Renewal alerts"), " workflow reads the file and opens one issue per upcoming charge, using each subscription’s reminder setting. GitHub emails you about new issues, so no email service or secrets are needed. Close the issue when you’ve decided."), h("p", { class: "eyebrow" }, due.length ? `If it ran today, it would open ${due.length} ${due.length === 1 ? "issue" : "issues"}` : "If it ran today"), due.length ? h("ul", { class: "issue-preview" }, due.map((u) => h("li", null, icon("circle-check", 15), alertIssue(u, state.settings.currency).title))) : h("p", { class: "hint" }, "Nothing is inside its reminder window today."))), h("div", { class: "split-grid" }, h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Backup & reports")), h("p", { class: "hint" }, "Everything is saved in this browser. Download a backup to move it to another device. Backups from the original FinHub app import too."), h("div", { class: "row wrap" }, button("Download backup", () => download(`tally-backup-${today}.json`, JSON.stringify(store.state, null, 2)), { icon: "download" }), h("label", { class: "btn btn-ghost" }, icon("upload", 17), h("span", null, "Restore backup"), h("input", {
+	}, { icon: "download" }))), h("li", { class: "card step" }, h("h3", null, "Get alerts"), h("p", null, "Every morning the ", h("code", null, "Renewal alerts"), " workflow reads the file and opens one issue per upcoming charge, using each subscription’s reminder setting. GitHub emails you about new issues, so no email service or secrets are needed. Close the issue when you’ve decided."), h("p", { class: "eyebrow" }, due.length ? `If it ran today, it would open ${due.length} ${due.length === 1 ? "issue" : "issues"}` : "If it ran today"), due.length ? h("ul", { class: "issue-preview" }, due.map((u) => h("li", null, icon("circle-check", 15), alertIssue(u, state.settings.currency).title))) : h("p", { class: "hint" }, "Nothing is inside its reminder window today.")))), h("div", { class: "split-grid" }, h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Backup & reports")), h("p", { class: "hint" }, "Everything is saved in this browser. Download a backup to move it to another device. Backups from the original FinHub app import too."), h("div", { class: "row wrap" }, button("Download backup", () => download(`tally-backup-${today}.json`, JSON.stringify(store.state, null, 2)), { icon: "download" }), h("label", { class: "btn btn-ghost" }, icon("upload", 17), h("span", null, "Restore backup"), h("input", {
 		type: "file",
 		accept: ".json,application/json",
 		class: "sr-only",
@@ -8753,6 +9452,620 @@ async function importSpending(file, ctx) {
 	});
 }
 //#endregion
+//#region src/lib/alternatives.ts
+var GOAL_LABEL = {
+	cheaper: "Cheaper",
+	better: "Better quality",
+	value: "Best value"
+};
+var CYCLE_WORD = {
+	weekly: "week",
+	monthly: "month",
+	quarterly: "quarter",
+	annual: "year"
+};
+var PER_MONTH = {
+	weekly: 52 / 12,
+	monthly: 1,
+	quarterly: 1 / 3,
+	annual: 1 / 12
+};
+function monthlyOf(price, cycle) {
+	if (price === null || cycle === null) return null;
+	return Math.round(price * PER_MONTH[cycle]);
+}
+function buildAltPrompt(r) {
+	const goal = {
+		cheaper: "CHEAPER options that still do the job. Include cheaper plans or tiers from the same provider (ad-supported, basic, annual, family or student plans) as well as other providers and genuinely free options.",
+		better: "HIGHER-QUALITY options: better features, service or reliability, even if they cost more. Say plainly how much more they cost and what the extra money buys.",
+		value: "the BEST VALUE: options that give the most for the money. They may cost a little more or less than now; explain the trade."
+	}[r.goal];
+	return {
+		system: `You are the "Find alternatives" helper inside Tally, a personal-finance web app. You suggest alternatives to something a person pays for. Your suggestions are ideas for them to check, not financial advice.
+
+Rules:
+- Suggest 3 to 5 real, currently available products, services or plans. Never invent a product. Prefer well-known options that are available in the person's country.
+- Prices: give the typical list price you are reasonably confident about, in ${r.currency}, and mark it approximate with "~". If you are not reasonably sure of a price, use null for "monthly" and describe the price in words.
+- Be honest about trade-offs (ads, fewer features, contracts, lower quality).
+- Keep each text field under 180 characters. Plain text only, no Markdown.
+- Reply with ONLY a JSON object, no other text, in exactly this shape:
+{"alternatives":[{"name":"Product and plan name","kind":"Switch plan | Switch provider | Free option | Upgrade","price":"~$6.99/month","monthly":6.99,"why":"Why it fits their goal","tradeoffs":"What they give up or pay extra for","bestFor":"Who it suits"}],"tips":["One or two short, specific ways to pay less for what they already have"]}
+"monthly" is the approximate cost per month as a plain number in ${r.currency} (convert yearly prices by dividing by 12), or null.`,
+		user: [
+			`I pay for: ${r.item}${r.category ? ` (category: ${r.category})` : ""}.`,
+			r.price !== null && r.cycle ? `I pay ${toMajor(r.price, r.currency).toFixed(2)} ${r.currency} per ${CYCLE_WORD[r.cycle]}.` : "I did not say what I pay.",
+			`I want ${goal}`,
+			r.region.trim() ? `I live in: ${r.region.trim()}.` : "",
+			r.notes.trim() ? `What matters to me: ${r.notes.trim()}` : ""
+		].filter(Boolean).join("\n")
+	};
+}
+var clip = (v, n = 240) => typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "";
+/** The first balanced {...} in the text (models sometimes wrap JSON in prose or fences). */
+function firstJsonObject(text) {
+	const start = text.indexOf("{");
+	if (start < 0) return null;
+	let depth = 0;
+	let inStr = false;
+	for (let i = start; i < text.length; i++) {
+		const c = text[i];
+		if (inStr) {
+			if (c === "\\") i++;
+			else if (c === "\"") inStr = false;
+		} else if (c === "\"") inStr = true;
+		else if (c === "{") depth++;
+		else if (c === "}" && --depth === 0) return text.slice(start, i + 1);
+	}
+	return null;
+}
+/**
+* Parse the AI's reply. Returns null if there's no usable JSON, so the caller
+* can show the reply as plain text instead.
+*/
+function parseAltReply(text, currency = "USD") {
+	const raw = firstJsonObject(text);
+	if (!raw) return null;
+	let json;
+	try {
+		json = JSON.parse(raw);
+	} catch {
+		return null;
+	}
+	if (typeof json !== "object" || json === null) return null;
+	const obj = json;
+	if (!Array.isArray(obj.alternatives)) return null;
+	const alternatives = obj.alternatives.filter((a) => typeof a === "object" && a !== null).map((a) => {
+		const m = typeof a.monthly === "number" ? a.monthly : typeof a.monthly === "string" ? Number(a.monthly.replace(/[^\d.]/g, "")) : NaN;
+		return {
+			name: clip(a.name, 80),
+			kind: clip(a.kind, 40),
+			priceText: clip(a.price, 60),
+			monthly: Number.isFinite(m) && m >= 0 ? parseMoney(m, currency) : null,
+			why: clip(a.why),
+			tradeoffs: clip(a.tradeoffs),
+			bestFor: clip(a.bestFor)
+		};
+	}).filter((a) => a.name).slice(0, 6);
+	if (!alternatives.length) return null;
+	return {
+		alternatives,
+		tips: Array.isArray(obj.tips) ? obj.tips.map((t) => clip(t, 220)).filter(Boolean).slice(0, 4) : []
+	};
+}
+/** Yearly difference against what they pay now (positive = saves money). */
+function yearlySaving(currentMonthly, altMonthly) {
+	if (currentMonthly === null || altMonthly === null) return null;
+	return (currentMonthly - altMonthly) * 12;
+}
+/** A web search for the suggestion. AI-made links can be wrong; a search can't be. */
+function searchLink(name, region) {
+	const q = `${name} price${region.trim() ? ` ${region.trim()}` : ""}`;
+	return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+var GENERAL = [
+	{
+		title: "Ask for a better price",
+		detail: "Start to cancel, or call and ask. Many services offer a retention discount or a cheaper plan they don’t advertise."
+	},
+	{
+		title: "Pay yearly for what you keep",
+		detail: "Yearly plans often include about two months free. Only worth it for things you use all year."
+	},
+	{
+		title: "Look for a cheaper tier",
+		detail: "Basic, ad-supported, student or family plans can cost much less for most of the same features."
+	}
+];
+var BY_TOPIC = [
+	[/netflix|disney|hulu|max\b|hbo|prime video|paramount|peacock|stream|tv|video|apple tv|youtube/i, [
+		{
+			title: "Rotate instead of stacking",
+			detail: "Keep one streaming service at a time: binge what you want, cancel, then switch to the next."
+		},
+		{
+			title: "Try an ad-supported plan",
+			detail: "Most streaming services have one for a fraction of the price."
+		},
+		{
+			title: "Check your library",
+			detail: "Many public libraries include free film and TV streaming (for example Kanopy or Hoopla)."
+		}
+	]],
+	[/spotify|music|apple music|tidal|deezer|audible|podcast/i, [{
+		title: "Share a family or duo plan",
+		detail: "Splitting a family plan with people you live with can cut the cost per person by more than half."
+	}, {
+		title: "Student pricing",
+		detail: "Music services usually offer about half price for students."
+	}]],
+	[/gym|fitness|yoga|peloton|class|sport/i, [{
+		title: "Match the plan to how often you go",
+		detail: "If you go less than weekly, pay-per-visit or a class pack often costs less than a membership."
+	}, {
+		title: "Check your employer or insurer",
+		detail: "Some offer gym discounts or reimbursements."
+	}]],
+	[/phone|mobile|cell|sim|verizon|t-mobile|at&t|vodafone|\bee\b|o2\b|carrier/i, [{
+		title: "Try a budget carrier",
+		detail: "Smaller carriers often use the same networks for much less. Check coverage where you live first."
+	}, {
+		title: "Check how much data you use",
+		detail: "Most people pay for more data than they use. Your phone’s settings show last month’s usage."
+	}]],
+	[/internet|broadband|wifi|fiber|cable|comcast|xfinity/i, [{
+		title: "Ask about new-customer prices",
+		detail: "Prices often rise after an intro period. Asking, or threatening to switch, frequently brings them down."
+	}, {
+		title: "Check the speed you need",
+		detail: "A lower speed tier is often plenty for streaming and video calls."
+	}]],
+	[/cloud|storage|icloud|dropbox|google one|onedrive|backup/i, [{
+		title: "Clean up before you upgrade",
+		detail: "Deleting duplicates and big old videos can keep you on a smaller plan."
+	}, {
+		title: "Use what you already have",
+		detail: "Some subscriptions (for example Microsoft 365 or Amazon Prime) already include cloud storage."
+	}]],
+	[/news|magazine|times|journal|post|newspaper|substack/i, [{
+		title: "Use your library card",
+		detail: "Many libraries give free digital access to major newspapers and magazines."
+	}]],
+	[/software|app|adobe|office|microsoft|copilot|chatgpt|vpn|password|notion|canva/i, [{
+		title: "Check for a free or open-source alternative",
+		detail: "Many paid apps have free alternatives that cover everyday use."
+	}, {
+		title: "Look for education or bundle pricing",
+		detail: "Students, teachers and some employers get big discounts."
+	}]],
+	[/insurance|car|auto/i, [{
+		title: "Compare quotes every year",
+		detail: "Loyal customers often pay more than new ones. A quick comparison can save a lot."
+	}]]
+];
+/** Offline ideas that always work, specific to the kind of thing when possible. */
+function waysToPayLess(item, category = "") {
+	const text = `${item} ${category}`;
+	return [...BY_TOPIC.filter(([re]) => re.test(text)).flatMap(([, m]) => m), ...GENERAL].slice(0, 5);
+}
+//#endregion
+//#region src/views/alternatives.ts
+var CYCLE_LABEL = {
+	weekly: "week",
+	monthly: "month",
+	quarterly: "quarter",
+	annual: "year"
+};
+var source = "sub";
+var subId = "";
+var item = "";
+var priceStr = "";
+var cycle = "monthly";
+var goal = "cheaper";
+var notes = "";
+var region = (() => {
+	try {
+		const saved = localStorage.getItem("tally:alt-region");
+		if (saved !== null) return saved;
+	} catch {}
+	try {
+		const code = new Intl.Locale(navigator.language).maximize().region;
+		return code ? new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? "" : "";
+	} catch {
+		return "";
+	}
+})();
+var run = null;
+var resultsHost = null;
+var rerenderPage = () => {};
+/** Open the page with one of the person's subscriptions already chosen. */
+function preselectAlternative(id) {
+	source = "sub";
+	subId = id;
+}
+function alternativesView(ctx) {
+	const { state } = ctx;
+	rerenderPage = ctx.rerender;
+	const subs = state.subscriptions.filter(isBilling);
+	if (source === "sub" && !subs.some((s) => s.id === subId)) subId = subs[0]?.id ?? "";
+	if (!subs.length) source = "other";
+	resultsHost = h("div", {
+		class: "alt-results",
+		"aria-live": "polite"
+	});
+	paintResults(ctx);
+	return h("section", {
+		class: "view",
+		"aria-labelledby": "alt-title"
+	}, h("div", { class: "toolbar" }, h("h2", {
+		id: "alt-title",
+		class: "section-title"
+	}, "Alternatives"), h("p", { class: "muted" }, "Paying too much, or want something better? Pick what you pay for and get ideas. You choose what, if anything, to switch to.")), h("div", { class: "alt-grid" }, h("div", { class: "alt-col" }, askCard(ctx, subs), shortlistCard(ctx)), h("div", { class: "alt-col" }, resultsHost)));
+}
+function askCard(ctx, subs) {
+	const cur = ctx.state.settings.currency;
+	const form = h("form", { class: "alt-form" });
+	form.addEventListener("submit", (e) => {
+		e.preventDefault();
+		find(ctx);
+	});
+	const chosen = subs.find((s) => s.id === subId);
+	append(form, [
+		subs.length ? h("div", { class: "field" }, h("span", { class: "field-label" }, "What do you want alternatives for?"), segmented("Source", [{
+			value: "sub",
+			label: "One of my subscriptions",
+			icon: "repeat"
+		}, {
+			value: "other",
+			label: "Something else",
+			icon: "tag"
+		}], source, (v) => {
+			source = v;
+			ctx.rerender();
+		})) : null,
+		source === "sub" && subs.length ? field("Subscription", h("select", {
+			dataset: { key: "alt-sub" },
+			onChange: (e) => {
+				subId = e.target.value;
+				ctx.rerender();
+			}
+		}, subs.map((s) => h("option", {
+			value: s.id,
+			selected: s.id === subId
+		}, `${s.name} · ${formatMoney(s.amount, cur)}/${CYCLE_LABEL[s.cycle]}`))), chosen ? `${chosen.category}. Change its details on the Subscriptions tab.` : void 0) : h("div", { class: "grid-form" }, field("What is it?", h("input", {
+			value: item,
+			placeholder: "e.g. phone plan, Spotify, gym, car insurance",
+			autocomplete: "off",
+			dataset: { key: "alt-item" },
+			onInput: (e) => {
+				item = e.target.value;
+			}
+		})), h("div", { class: "pair" }, field("What you pay (optional)", h("input", {
+			value: priceStr,
+			inputMode: "decimal",
+			class: "num",
+			placeholder: "14.99",
+			dataset: { key: "alt-price" },
+			onInput: (e) => {
+				priceStr = e.target.value;
+			}
+		})), field("Every", h("select", {
+			dataset: { key: "alt-cycle" },
+			onChange: (e) => {
+				cycle = e.target.value;
+			}
+		}, CYCLES.map((c) => h("option", {
+			value: c,
+			selected: c === cycle
+		}, CYCLE_LABEL[c])))))),
+		h("div", { class: "field" }, h("span", { class: "field-label" }, "I’m looking for"), segmented("Goal", [
+			{
+				value: "cheaper",
+				label: GOAL_LABEL.cheaper,
+				icon: "piggy-bank"
+			},
+			{
+				value: "better",
+				label: GOAL_LABEL.better,
+				icon: "gem"
+			},
+			{
+				value: "value",
+				label: GOAL_LABEL.value,
+				icon: "scale"
+			}
+		], goal, (v) => {
+			goal = v;
+			ctx.rerender();
+		})),
+		h("div", { class: "pair" }, field("Anything that matters? (optional)", h("input", {
+			value: notes,
+			placeholder: "e.g. need 4K, student",
+			autocomplete: "off",
+			dataset: { key: "alt-notes" },
+			onInput: (e) => {
+				notes = e.target.value;
+			}
+		})), field("Where you live", h("input", {
+			value: region,
+			placeholder: "Country",
+			autocomplete: "country-name",
+			dataset: { key: "alt-region" },
+			onInput: (e) => {
+				region = e.target.value;
+				try {
+					localStorage.setItem("tally:alt-region", region);
+				} catch {}
+			}
+		}), "Prices and options differ by country.")),
+		h("div", { class: "row" }, run && (run.status === "thinking" || run.status === "streaming") ? button("Stop", () => run?.ctrl?.abort(), {
+			icon: "square",
+			key: "alt-stop"
+		}) : button("Find alternatives", () => {}, {
+			type: "submit",
+			variant: "primary",
+			icon: "sparkles",
+			key: "alt-find"
+		}))
+	]);
+	return h("div", { class: "card" }, form);
+}
+async function find(ctx) {
+	const cur = ctx.state.settings.currency;
+	let forName;
+	let forSubId;
+	let price = null;
+	let cyc = null;
+	let category;
+	if (source === "sub") {
+		const s = ctx.state.subscriptions.find((x) => x.id === subId);
+		if (!s) return toast("Choose a subscription first.");
+		forName = s.name;
+		forSubId = s.id;
+		price = s.amount;
+		cyc = s.cycle;
+		category = s.category;
+	} else {
+		forName = item.trim();
+		if (!forName) {
+			toast("Type what you pay for, like “phone plan” or “Spotify”.");
+			document.querySelector("[data-key=alt-item]")?.focus();
+			return;
+		}
+		if (priceStr.trim()) {
+			price = parseMoney(priceStr, cur);
+			if (price === null || price < 0) return toast("Enter a price like 14.99, or leave it blank.");
+			cyc = cycle;
+		}
+	}
+	run?.ctrl?.abort();
+	const ctrl = new AbortController();
+	const current = {
+		status: "thinking",
+		text: "",
+		parsed: null,
+		forName,
+		forSubId,
+		currentMonthly: monthlyOf(price, cyc),
+		goal,
+		ctrl
+	};
+	run = current;
+	ctx.rerender();
+	if (matchMedia("(max-width: 980px)").matches) requestAnimationFrame(() => resultsHost?.scrollIntoView({
+		behavior: "smooth",
+		block: "start"
+	}));
+	const cfg = loadAI();
+	const provider = await resolveProvider(cfg);
+	if (run !== current) return;
+	if (!provider) {
+		current.status = "off";
+		return rerenderPage();
+	}
+	current.provider = provider;
+	const { system, user } = buildAltPrompt({
+		item: forName,
+		price,
+		cycle: cyc,
+		category,
+		goal,
+		notes,
+		region,
+		currency: cur
+	});
+	try {
+		await streamAnswer({
+			provider,
+			cfg,
+			system,
+			messages: [{
+				role: "user",
+				content: user
+			}],
+			signal: ctrl.signal,
+			maxTokens: 2e3,
+			onText: (t) => {
+				current.text += t;
+				if (current.status !== "streaming") {
+					current.status = "streaming";
+					if (run === current) paintResults(ctx);
+				}
+			}
+		});
+		current.parsed = parseAltReply(current.text, cur);
+		current.status = "done";
+	} catch (e) {
+		if (e.name === "AbortError") current.status = "stopped";
+		else {
+			current.status = "error";
+			current.error = e instanceof AIError ? e.message : "Something went wrong getting suggestions. Try again.";
+		}
+	}
+	if (run === current) rerenderPage();
+}
+function paintResults(ctx) {
+	if (!resultsHost) return;
+	resultsHost.replaceChildren(...resultsContent(ctx));
+}
+function resultsContent(ctx) {
+	const money = ctx.money;
+	const forName = run?.forName ?? (source === "sub" ? ctx.state.subscriptions.find((s) => s.id === subId)?.name ?? "" : item.trim());
+	const moves = waysToPayLess(forName, source === "sub" ? ctx.state.subscriptions.find((s) => s.id === subId)?.category : "");
+	const movesCard = h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, forName ? `Ways to pay less for ${forName}` : "Ways to pay less"), h("span", { class: "tag" }, "Works without AI")), h("ul", { class: "moves" }, moves.map((m) => h("li", null, icon("lightbulb", 16), h("div", null, h("p", { class: "strong" }, m.title), h("p", { class: "hint" }, m.detail))))));
+	if (!run) return [h("div", { class: "card alt-empty" }, h("span", {
+		class: "alt-empty-icon",
+		"aria-hidden": "true"
+	}, icon("arrow-right-left", 26)), h("h3", null, "Suggestions appear here"), h("p", { class: "hint" }, "Choose something you pay for and what you’re after, then click Find alternatives. You’ll get a few options with rough prices, what you’d gain and what you’d give up. Save the ones you like to your shortlist.")), movesCard];
+	const head = h("div", { class: "card-head" }, h("div", null, h("p", { class: "eyebrow" }, `${GOAL_LABEL[run.goal]} alternatives to`), h("h3", null, run.forName)), run.currentMonthly !== null ? h("p", { class: "hint" }, `You pay about ${money(run.currentMonthly)} a month now`) : null);
+	if (run.status === "thinking" || run.status === "streaming") return [h("div", {
+		class: "card",
+		"aria-busy": "true"
+	}, head, h("p", { class: "thinking" }, run.status === "thinking" ? "Connecting" : "Looking for alternatives", h("span", { class: "dots" })), h("div", { class: "alt-skeleton" }, h("span"), h("span"), h("span"))), movesCard];
+	if (run.status === "off") return [h("div", { class: "card ai-off" }, head, h("p", null, icon("bot", 17), " Specific suggestions need an AI connection, and none is set up in this browser yet."), h("p", { class: "hint" }, "Add a free Google Gemini key in Help → AI settings. It takes about two minutes, and the key stays in this browser."), h("a", {
+		class: "btn btn-primary btn-sm",
+		href: "#/help/settings"
+	}, icon("settings", 15), h("span", null, "Set up AI answers"))), movesCard];
+	if (run.status === "error" || run.status === "stopped") return [h("div", {
+		class: "card ai-error",
+		role: run.status === "error" ? "alert" : void 0
+	}, head, h("p", null, run.status === "stopped" ? "Stopped." : run.error ?? "Something went wrong."), button("Try again", () => void find(ctx), {
+		small: true,
+		icon: "refresh-cw"
+	})), movesCard];
+	const parsed = run.parsed;
+	const provider = run.provider ? PROVIDER_LABEL[run.provider] : "AI";
+	if (!parsed) return [h("div", { class: "card" }, head, h("div", { class: "md" }, renderMarkdown(run.text || "No suggestions came back. Try again, or add a detail about what matters to you.")), disclaimer(provider)), movesCard];
+	const shortlisted = new Set(ctx.state.alternatives.shortlist.filter((x) => x.forName === run.forName).map((x) => x.name.toLowerCase()));
+	return [h("div", { class: "card" }, head, h("ul", { class: "alt-list" }, parsed.alternatives.map((a) => altCard(ctx, a, shortlisted.has(a.name.toLowerCase())))), parsed.tips.length ? h("div", { class: "alt-tips" }, h("p", { class: "eyebrow" }, "Also worth trying"), h("ul", null, parsed.tips.map((t) => h("li", null, t)))) : null, disclaimer(provider)), movesCard];
+}
+function disclaimer(provider) {
+	return h("p", { class: "ai-disclaimer" }, icon("info", 14), ` Suggestions from ${provider}. Prices are approximate and may be out of date; check the provider’s site before you switch. This isn’t financial advice.`);
+}
+function savingBadge(ctx, saving) {
+	if (saving === null) return null;
+	if (saving > 0) return h("span", { class: "save-badge pos" }, `Saves ~${ctx.money(saving)}/yr`);
+	if (saving < 0) return h("span", { class: "save-badge neg" }, `Costs ~${ctx.money(-saving)}/yr more`);
+	return h("span", { class: "save-badge" }, "About the same price");
+}
+function altCard(ctx, a, saved) {
+	const r = run;
+	const saving = yearlySaving(r.currentMonthly, a.monthly);
+	return h("li", { class: "alt-card" }, h("div", { class: "alt-top" }, h("div", null, h("p", { class: "alt-name" }, a.name), h("p", { class: "hint" }, [a.kind, a.priceText].filter(Boolean).join(" · "))), savingBadge(ctx, saving)), a.why ? h("p", null, a.why) : null, h("dl", { class: "alt-facts" }, a.tradeoffs ? [h("dt", null, "Trade-offs"), h("dd", null, a.tradeoffs)] : null, a.bestFor ? [h("dt", null, "Best for"), h("dd", null, a.bestFor)] : null), h("div", { class: "row wrap" }, saved ? h("span", { class: "saved-note" }, icon("check", 15), " On your shortlist") : button("Save to shortlist", () => {
+		store.update(`Shortlist ${a.name}`, (d) => {
+			d.alternatives.shortlist.unshift({
+				id: uid(),
+				name: a.name,
+				priceText: a.priceText,
+				monthly: a.monthly,
+				why: a.why,
+				goal: r.goal,
+				forName: r.forName,
+				...r.forSubId ? { forSubId: r.forSubId } : {},
+				savedOn: ctx.today
+			});
+		});
+		toast(`Saved ${a.name} to your shortlist`, {
+			label: "Undo",
+			run: () => store.undo()
+		});
+	}, {
+		small: true,
+		icon: "bookmark",
+		key: `alt-save-${a.name}`
+	}), h("a", {
+		class: "btn btn-quiet btn-sm",
+		href: searchLink(a.name, region),
+		target: "_blank",
+		rel: "noopener noreferrer"
+	}, icon("external-link", 15), h("span", null, "Look it up"))));
+}
+function shortlistCard(ctx) {
+	const { state, money } = ctx;
+	const list = state.alternatives.shortlist;
+	const subMonthly = (id) => {
+		const s = id ? state.subscriptions.find((x) => x.id === id && isBilling(x)) : void 0;
+		return s ? monthlyOf(s.amount, s.cycle) : null;
+	};
+	const best = /* @__PURE__ */ new Map();
+	for (const x of list) {
+		const s = yearlySaving(subMonthly(x.forSubId), x.monthly);
+		if (s !== null && s > 0) best.set(x.forName, Math.max(best.get(x.forName) ?? 0, s));
+	}
+	const potential = [...best.values()].reduce((a, b) => a + b, 0);
+	return h("div", { class: "card" }, h("div", { class: "card-head" }, h("h3", null, "Your shortlist"), potential > 0 ? h("span", { class: "save-badge pos" }, `Up to ~${money(potential)}/yr`) : null), list.length ? h("ul", { class: "shortlist" }, list.map((x) => {
+		const sub = x.forSubId ? state.subscriptions.find((s) => s.id === x.forSubId) : void 0;
+		return h("li", null, h("div", { class: "alt-top" }, h("div", null, h("p", { class: "strong" }, x.name), h("p", { class: "hint" }, `Instead of ${x.forName}${x.priceText ? ` · ${x.priceText}` : ""}`)), savingBadge(ctx, yearlySaving(subMonthly(x.forSubId), x.monthly))), h("div", { class: "row wrap" }, sub ? button("I switched", () => switchTo(ctx, x.id), {
+			small: true,
+			icon: "arrow-right-left",
+			key: `sl-switch-${x.id}`
+		}) : null, h("a", {
+			class: "btn btn-quiet btn-sm",
+			href: searchLink(x.name, region),
+			target: "_blank",
+			rel: "noopener noreferrer"
+		}, icon("external-link", 15), h("span", null, "Look it up")), button("", () => {
+			store.update(`Remove ${x.name}`, (d) => {
+				d.alternatives.shortlist = d.alternatives.shortlist.filter((y) => y.id !== x.id);
+			});
+			toast(`Removed ${x.name}`, {
+				label: "Undo",
+				run: () => store.undo()
+			});
+		}, {
+			small: true,
+			icon: "x",
+			variant: "quiet",
+			title: `Remove ${x.name} from the shortlist`
+		})));
+	})) : h("p", { class: "hint" }, "Save suggestions you like, compare them here, and mark one as switched when you make the change. Nothing changes until you say so."));
+}
+/** Replace the subscription with the chosen alternative (name and price), keeping its history. */
+function switchTo(ctx, savedId) {
+	const x = ctx.state.alternatives.shortlist.find((y) => y.id === savedId);
+	const sub = x?.forSubId ? ctx.state.subscriptions.find((s) => s.id === x.forSubId) : void 0;
+	if (!x || !sub) return;
+	const cur = ctx.state.settings.currency;
+	openDialog({
+		title: `Switch from ${sub.name}?`,
+		submitLabel: "Update my subscription",
+		body: () => h("div", { class: "grid-form" }, h("p", { class: "hint" }, `Tally updates ${sub.name} to the new service and price, and keeps the old price in its history. Remember to cancel ${sub.name} with the company too.`), field("New name", h("input", {
+			name: "name",
+			value: x.name,
+			required: true
+		})), h("div", { class: "pair" }, field("New price", h("input", {
+			name: "price",
+			inputMode: "decimal",
+			class: "num",
+			required: true,
+			value: x.monthly !== null ? toInputValue(x.monthly, cur) : ""
+		})), field("Every", h("select", { name: "cycle" }, CYCLES.map((c) => h("option", {
+			value: c,
+			selected: c === (x.monthly !== null ? "monthly" : sub.cycle)
+		}, CYCLE_LABEL[c])))))),
+		onSubmit: (data) => {
+			const name = String(data.get("name")).trim();
+			const price = parseMoney(String(data.get("price")), cur);
+			const cyc = String(data.get("cycle"));
+			if (!name) return "Enter a name.";
+			if (price === null || price < 0) return "Enter the new price, like 7.99 (0 if it’s free).";
+			store.update(`Switch ${sub.name} to ${name}`, (d) => {
+				const s = d.subscriptions.find((y) => y.id === sub.id);
+				if (s) {
+					s.history = s.cycle === cyc ? withPriceChange(s, price, ctx.today) : s.history;
+					s.name = name;
+					s.amount = price;
+					s.cycle = cyc;
+				}
+				d.alternatives.shortlist = d.alternatives.shortlist.filter((y) => y.forSubId !== sub.id);
+			});
+			toast(`Switched to ${name}. Don’t forget to cancel ${sub.name}.`, {
+				label: "Undo",
+				run: () => store.undo()
+			}, 8e3);
+		}
+	});
+}
+//#endregion
 //#region src/main.ts
 var TABS = [
 	{
@@ -8777,6 +10090,12 @@ var TABS = [
 		icon: "wallet"
 	},
 	{
+		id: "alternatives",
+		label: "Alternatives",
+		short: "Swap",
+		icon: "arrow-right-left"
+	},
+	{
 		id: "sync",
 		label: "Sync",
 		icon: "git-branch"
@@ -8792,6 +10111,7 @@ var VIEWS = {
 	split: splitView,
 	cart: cartView,
 	budget: budgetView,
+	alternatives: alternativesView,
 	sync: syncView,
 	help: helpView
 };
@@ -8814,11 +10134,11 @@ var undoBtn = button("", () => undo(), {
 	title: "Undo (U)",
 	variant: "quiet"
 });
-var installBtn = button("Install app", () => void install(), {
-	icon: "download",
+var installBtn = button("Get the app", () => openGetApp(), {
+	icon: "smartphone",
 	variant: "ghost",
 	small: true,
-	title: "Install Tally on this device"
+	title: "Install Tally on this device, or open it on your phone"
 });
 installBtn.classList.add("install-btn");
 /**
@@ -8911,11 +10231,16 @@ function render() {
 	const focusKey = active?.dataset?.key;
 	const caret = active instanceof HTMLInputElement && active.type !== "checkbox" ? [active.selectionStart, active.selectionEnd] : null;
 	const tab = currentTab();
+	const { action } = route();
+	if (tab === "alternatives" && action) {
+		preselectAlternative(action);
+		history.replaceState(null, "", "#/alternatives");
+	}
 	const ctx = makeContext(today(), render, go);
 	renderNav();
 	applyTheme();
 	undoBtn.disabled = !store.canUndo;
-	installBtn.hidden = !canOfferInstall();
+	installBtn.hidden = !showGetApp();
 	setBadge(upcoming(store.state.subscriptions, ctx.today, 3).length);
 	const shared = route().shared;
 	const view = shared ? sharedView(ctx, shared) : VIEWS[tab](ctx);
@@ -9014,7 +10339,7 @@ function undo() {
 }
 function showShortcuts() {
 	const rows = [
-		["1 – 6", "Switch section"],
+		["1 – 7", "Switch section"],
 		["H", "Ask the help desk"],
 		["N", "Add to the current section"],
 		["U", "Undo last change"],
@@ -10633,6 +11958,62 @@ select:focus-visible {
   border: 1px solid var(--line);
   color: #0a84ff;
 }
+
+.get-app {
+  display: grid;
+  gap: 16px;
+}
+.get-app .lede {
+  margin: 0;
+}
+.install-now,
+.qr-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border-radius: var(--r);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+}
+.install-now {
+  grid-template-columns: 1fr auto;
+}
+.install-now p,
+.qr-card p {
+  margin: 0 0 4px;
+}
+.qr {
+  display: block;
+  width: 148px;
+  height: 148px;
+  border-radius: 8px;
+}
+.qr-url {
+  font: 0.78rem/1.4 var(--f-mono);
+  color: var(--ink-2);
+  word-break: break-all;
+}
+.note-box {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ochre-bg);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.note-box .icon {
+  flex: none;
+  margin-top: 3px;
+}
+.guide {
+  min-height: 180px;
+}
+
 .drop-overlay {
   position: fixed;
   inset: 12px;
@@ -11226,6 +12607,304 @@ select:focus-visible {
   from {
     opacity: 0;
     transform: translateY(4px);
+  }
+}
+
+/* ---------- sync: optional alerts setup ---------- */
+
+.alerts-setup {
+  padding: 0;
+}
+.alerts-setup > summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+.alerts-setup > summary::-webkit-details-marker {
+  display: none;
+}
+.alerts-setup > summary::after {
+  content: 'Show steps';
+  grid-column: 2;
+  justify-self: start;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.alerts-setup[open] > summary::after {
+  content: 'Hide steps';
+}
+.alerts-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--ink-2);
+}
+.alerts-title {
+  font-family: var(--f-display);
+  font-size: 1.2rem;
+  margin-right: 8px;
+}
+.alerts-sub {
+  display: block;
+  margin-top: 4px;
+  max-width: 70ch;
+}
+.alerts-setup > .steps {
+  padding: 0 18px 18px;
+}
+.alerts-setup .step {
+  box-shadow: none;
+  background: var(--card-2);
+}
+.repo-fields {
+  align-items: start;
+}
+.advanced {
+  margin: 10px 0 14px;
+  font-size: 0.9rem;
+}
+.advanced summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.advanced[open] > .grid-form {
+  margin-top: 10px;
+}
+.field-error {
+  margin: 4px 0 0;
+  color: var(--serial);
+  font-size: 0.84rem;
+}
+.field-error:empty {
+  display: none;
+}
+[aria-invalid='true'] {
+  border-color: var(--serial) !important;
+}
+
+/* ---------- alternatives ---------- */
+
+.alt-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: var(--gap);
+  align-items: start;
+}
+.alt-col {
+  display: grid;
+  gap: var(--gap);
+  min-width: 0;
+}
+.alt-form {
+  display: grid;
+  gap: 14px;
+}
+.alt-form .segmented {
+  justify-self: start;
+}
+.moves,
+.alt-list,
+.shortlist,
+.alt-tips ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.moves {
+  display: grid;
+  gap: 12px;
+}
+.moves li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.moves li > .icon {
+  margin-top: 3px;
+  color: var(--ochre);
+}
+.moves p,
+.alt-card p,
+.shortlist p {
+  margin: 0;
+}
+.alt-list {
+  display: grid;
+  gap: 12px;
+}
+.alt-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card-2);
+}
+.alt-card .row {
+  margin-top: 2px;
+}
+.alt-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.alt-name {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+.save-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.save-badge.pos {
+  background: var(--seal-bg);
+  border-color: transparent;
+  color: var(--seal);
+}
+.save-badge.neg {
+  background: var(--ochre-bg);
+  border-color: transparent;
+  color: var(--ochre);
+}
+.alt-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+.alt-facts dt {
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.alt-facts dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+.alt-tips {
+  margin-top: 16px;
+}
+.alt-tips li {
+  padding: 4px 0 4px 16px;
+  position: relative;
+  color: var(--ink-2);
+}
+.alt-tips li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.9em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--seal);
+}
+.alt-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+.alt-empty p {
+  margin: 0;
+}
+.alt-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--card-2);
+  color: var(--ink-2);
+}
+.alt-skeleton {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.alt-skeleton span {
+  height: 64px;
+  border-radius: var(--r);
+  background: linear-gradient(90deg, var(--card-2), var(--line-2), var(--card-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+.saved-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--seal);
+}
+.shortlist {
+  display: grid;
+}
+.shortlist li {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.shortlist li:last-child {
+  border-bottom: 0;
+}
+.shortlist .row {
+  margin-top: 0;
+}
+@media (max-width: 1100px) and (min-width: 761px) {
+  .install-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tab .tab-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tab .tab-short {
+    display: inline;
+  }
+  .tab {
+    padding: 7px 9px;
+  }
+  /* The ? key still opens the shortcuts list. */
+  .kbd-btn {
+    display: none;
+  }
+}
+@media (max-width: 980px) {
+  .alt-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -11845,6 +13524,14 @@ select:focus-visible {
   .step {
     padding-left: 18px;
     padding-top: 56px;
+  }
+  .qr-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .install-now {
+    grid-template-columns: 1fr;
   }
   .install-card {
     grid-template-columns: auto 1fr;
