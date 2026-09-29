@@ -73,8 +73,9 @@ function nextOccurrenceIndexed(anchor, cycle, from) {
   while (next < from) next = nthOccurrence(anchor, cycle, ++k);
   return { date: next, k };
 }
+var defaultLocale;
 function formatDate(date2, locale, opts = {}) {
-  return new Date(toUTC(date2)).toLocaleDateString(locale, {
+  return new Date(toUTC(date2)).toLocaleDateString(locale ?? defaultLocale, {
     timeZone: "UTC",
     month: "short",
     day: "numeric",
@@ -82,6 +83,9 @@ function formatDate(date2, locale, opts = {}) {
   });
 }
 function relativeDays(days) {
+  if (defaultLocale) {
+    return new Intl.RelativeTimeFormat(defaultLocale, { numeric: "auto" }).format(days, "day");
+  }
   if (days === 0) return "today";
   if (days === 1) return "tomorrow";
   if (days === -1) return "yesterday";
@@ -105,11 +109,13 @@ function toMajor(minor, currency = "USD") {
   return minor / 10 ** minorDigits(currency);
 }
 var fmtCache = /* @__PURE__ */ new Map();
+var defaultLocale2;
 function formatMoney(minor, currency = "USD", opts = {}) {
-  const key = `${opts.locale ?? ""}|${currency}|${opts.compact ? 1 : 0}|${opts.sign ? 1 : 0}`;
+  const locale = opts.locale ?? defaultLocale2;
+  const key = `${locale ?? ""}|${currency}|${opts.compact ? 1 : 0}|${opts.sign ? 1 : 0}`;
   let fmt = fmtCache.get(key);
   if (!fmt) {
-    fmt = new Intl.NumberFormat(opts.locale, {
+    fmt = new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
       ...opts.compact ? { notation: "compact", maximumFractionDigits: 1 } : {},

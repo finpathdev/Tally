@@ -15,8 +15,11 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 | **Subscriptions** | Every recurring charge, what it really costs, when it renews, and which ones to cancel. Finds forgotten ones in a bank export. |
 | **Split** | Shared costs split equally, by income, by shares or exact amounts, settled in the fewest possible payments. |
 | **Cart** | A shopping list with the real total, tax included, and a budget meter. |
-| **Budget** | Monthly budgets per category, savings goals, charts of where your money goes, and saving tips that show their math. |
-| **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items or a split. |
+| **Safe to spend** | One number: what you can spend each day until payday, after the bills and subscriptions due before then. |
+| **Budget** | Monthly budgets, savings goals, bills with due dates and reminders, charts of where your money goes, and saving tips. |
+| **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items, or a split item by item. |
+| **Move to another device** | Send everything from your computer to your phone with a moving QR code, a file or a link, encrypted with a one-time code. |
+| **Languages** | Asks “What language do you speak?” on the first visit, with 100+ languages and a search box. Built in: English, Spanish, Hindi, French, Portuguese, German, Chinese, Arabic (right-to-left), Bengali, Telugu and Tamil. Others are translated on the device where the browser can, or with the browser’s own Translate. |
 | **Alternatives** | Ideas for cheaper, better or better-value alternatives to anything you pay for, with a shortlist. |
 | **Help desk** | A built-in help library, plus optional AI answers. |
 | **Sync & alerts** | Optional: save to your own GitHub repo (encrypted if you like) and get an email before every renewal. |
@@ -29,7 +32,7 @@ This is the **one-file version**: the whole app is in `index.html`, and everythi
 
 | File | What it is |
 | :-- | :-- |
-| `index.html` | The entire app: all code and styles. Open it in a browser to use it. |
+| `index.html` | The entire app: all code, styles and built-in languages (compressed so it loads fast). Open it in a browser to use it. |
 | `tally-icon.svg`, `tally-icon-192.png`, `tally-icon-512.png`, `tally-icon-maskable-512.png`, `tally-apple-touch-icon.png` | The logo in the sizes browsers and phones need |
 | `tally-gloock.woff2`, `tally-hanken-grotesk.woff2`, `tally-martian-mono.woff2` | The three fonts |
 | `tally-manifest.webmanifest` | Lets people install Tally as an app |
@@ -46,15 +49,26 @@ This is the **one-file version**: the whole app is in `index.html`, and everythi
 
 To update later, upload the changed files again. Uploading replaces files with the same name.
 
+## Use your own domain (optional)
+
+1. Buy a domain from a registrar (Cloudflare, Namecheap, Porkbun…).
+2. Add a DNS record there: for `tally.yourname.com`, a **CNAME** pointing to `finpathdev.github.io`. For a bare `yourname.com`, four **A** records: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
+3. In this repository, open **Settings → Pages → Custom domain**, type the domain and click **Save**.
+4. Once the check passes, tick **Enforce HTTPS**.
+
+## Feedback
+
+The **Send feedback** and **Report a problem** links at the bottom of the app open a pre-filled issue in this repository. Keep **Issues** turned on in **Settings → General → Features** to receive them.
+
 ## Make links to your repository look good
 
 On GitHub, open **Settings → General**, scroll to **Social preview**, click **Edit → Upload an image**, and choose `tally-preview.png`. Links to the repository then show that picture.
 
 ## Edit it
 
-Open `index.html` in any text editor. Near the top is a `<style>` block with all the styling. The colors are defined once at the start, under `:root`. Below that is a `<script type="module">` block with all the code.
+`index.html` is generated and minified (squeezed onto a few long lines) so the site loads quickly, which makes it hard to edit by hand. To change Tally, edit the readable source in the full project (`tally.zip`, folder `src/`), then run `npm run build:site` to make a new set of these files and upload them again.
 
-You can open `index.html` straight from your computer to try changes. Offline mode and the install button only work once it's on your website (https).
+You can open `index.html` straight from your computer to try it. Offline mode and the install button only work once it's on your website (https).
 
 ## Optional: email alerts before renewals
 

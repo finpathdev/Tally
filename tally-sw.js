@@ -12,12 +12,12 @@
  *   versioned files from jsDelivr are cached after the first scan so
  *   scanning also works offline. No photo or personal data is ever sent.
  */
-const VERSION = 'c04f754cfd04';
+const VERSION = 'b537d767462f';
 const PRECACHE = ["./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
 const CACHE = `tally-${VERSION}`;
 // Kept across app updates: the files are versioned in their URLs.
 const OCR_CACHE = 'ocr-v1';
-const OCR_FILES = /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js@|tesseract\.js-core@|@tesseract\.js-data\/)/;
+const OCR_FILES = /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js@|tesseract\.js-core@|@tesseract\.js-data\/|jsqr@)/;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', ...PRECACHE])));
@@ -118,7 +118,7 @@ async function checkReminders() {
       tag: r.key,
       icon: 'tally-icon-192.png',
       badge: 'tally-icon-192.png',
-      data: { url: './#/subscriptions' },
+      data: { url: `./${r.href || '#/subscriptions'}` },
     });
     shown.add(r.key);
   }
