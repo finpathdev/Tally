@@ -19,7 +19,7 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 | **Budget** | Monthly budgets, savings goals, bills with due dates and reminders, charts of where your money goes, and saving tips. |
 | **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items, or a split item by item. |
 | **Move to another device** | Send everything from your computer to your phone with a moving QR code, a file or a link, encrypted with a one-time code. |
-| **Languages** | Asks “What language do you speak?” on the first visit, with 100+ languages and a search box. Built in: English, Spanish, Hindi, French, Portuguese, German, Chinese, Arabic (right-to-left), Bengali, Telugu and Tamil. Others are translated on the device where the browser can, or with the browser’s own Translate. |
+| **Languages** | Asks “What language do you speak?” on the first visit, with 100+ languages and a search box. Built in: English, Spanish, Hindi, French, Portuguese, German, Chinese, Arabic (right-to-left), Bengali, Telugu and Tamil. Others are translated on the device where the browser can, or with the browser’s own Translate. Change or reset it any time with the language button at the top. |
 | **Alternatives** | Ideas for cheaper, better or better-value alternatives to anything you pay for, with a shortlist. |
 | **Help desk** | A built-in help library, plus optional AI answers. |
 | **Sync & alerts** | Optional: save to your own GitHub repo (encrypted if you like) and get an email before every renewal. |
