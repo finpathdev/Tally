@@ -12,7 +12,7 @@
  *   versioned files from jsDelivr are cached after the first scan so
  *   scanning also works offline. No photo or personal data is ever sent.
  */
-const VERSION = '20261121r2';
+const VERSION = '20261121r3';
 const PRECACHE = ["./tally-core.mjs","./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
 const CACHE = `tally-${VERSION}`;
 // Kept across app updates: the files are versioned in their URLs.
@@ -34,6 +34,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'skip-waiting') self.skipWaiting();
+  if (event.data === 'check-reminders') event.waitUntil(checkReminders());
 });
 
 self.addEventListener('fetch', (event) => {
@@ -105,25 +106,39 @@ function localToday() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function shiftDay(iso, days) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function checkReminders() {
   const enabled = await kv('readonly', (s) => s.get('enabled'));
   if (!enabled || self.Notification?.permission !== 'granted') return;
   const schedule = (await kv('readonly', (s) => s.get('schedule'))) || [];
   const shown = new Set((await kv('readonly', (s) => s.get('notified'))) || []);
+  const snooze = (await kv('readonly', (s) => s.get('snooze'))) || {};
   const on = localToday();
-  const due = schedule.filter((r) => r.notifyOn <= on && r.date >= on && !shown.has(r.key));
+  const oldest = shiftDay(on, -45);
+  const due = schedule.filter((r) => {
+    const until = snooze[r.key];
+    if (until && until > on) return false;
+    if (shown.has(r.key)) return false;
+    if (!r.notifyOn || r.notifyOn > on) return false;
+    return r.date >= oldest;
+  });
   for (const r of due) {
     await self.registration.showNotification(r.title, {
       body: r.body,
       tag: r.key,
       icon: 'tally-icon-192.png',
       badge: 'tally-icon-192.png',
-      data: { url: `./${r.href || '#/subscriptions'}` },
+      data: { url: `./${r.href || '#/today'}` },
     });
     shown.add(r.key);
   }
   if (due.length) {
-    const live = new Set(schedule.filter((r) => r.date >= on).map((r) => r.key));
+    const live = new Set(schedule.filter((r) => r.date >= oldest).map((r) => r.key));
     await kv('readwrite', (s) => s.put([...shown].filter((k) => live.has(k)), 'notified'));
   }
 }

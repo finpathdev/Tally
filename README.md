@@ -12,7 +12,7 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 | | |
 | :-- | :-- |
-| **Today** | The first screen. What's safe to spend until payday, this month's money in against money out, the next week of bills and renewals, and any budget that's running hot. |
+| **Today** | The first screen. What's safe to spend until payday, this month's money in against money out, bills that are due or overdue, and any budget that's running hot. |
 | **Subscriptions** | Every recurring charge, what it really costs, when it renews, and which ones to cancel. Finds forgotten ones in a bank export. |
 | **Split** | Shared costs split equally, by income, by shares or exact amounts, settled in the fewest possible payments. |
 | **Cart** | A shopping list with the real total, tax included, and a budget meter. |
@@ -24,11 +24,13 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 | **Languages** | Asks “What language do you speak?” on the first visit, with 100+ languages and a search box. Built in: English, Spanish, Hindi, French, Portuguese, German, Chinese, Arabic (right-to-left), Bengali, Telugu and Tamil. Others are translated on the device where the browser can, or with the browser’s own Translate. Change or reset it any time with the language button at the top. |
 | **Alternatives** | Ideas for cheaper, better or better-value alternatives to anything you pay for, with a shortlist. |
 | **Help desk** | A built-in help library, plus optional AI answers. |
+| **Year in Tally** | The whole year: money in against money out, totals by category and month, the biggest changes, what subscriptions cost per year, and savings-goal progress. The print and image copies leave names off unless you tick **Include names**. |
+| **Reminders** | On this device. Each bill and subscription has its own lead time. Tally lists what's due even if notifications are off, and can notify through the browser or the installed app. Snooze, dismiss, or mark a bill paid. **Add to calendar** downloads bills and renewals as an `.ics` file. Amounts stay out of that file. |
 | **Sync & alerts** | Optional: save to your own GitHub repo (encrypted if you like) and get an email before every renewal. |
 
 It installs like an app (click **Get the app**: there's a QR code to open it on your phone, and steps for iPhone, Android and computers), works offline, and has light and dark themes.
 
-Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, the running total, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. The ten built-in languages include Today, rollover, search, the import review, and the empty states. Arabic lays the screen out from right to left.
+Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, the running total, reminder timing, the year review, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. The ten built-in languages include Today, reminders, Year in Tally, rollover, search, the import review, and the empty states. Arabic lays the screen out from right to left.
 
 ## Files
 
