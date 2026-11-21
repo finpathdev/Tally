@@ -14,6 +14,7 @@ import {
   parseMoney,
   paydaysBetween,
   rolloverCarry,
+  runningNet,
   safeToSpend,
   salvageState,
   settle,
@@ -249,6 +250,99 @@ test("paydays in a month follow the schedule", () => {
     "2026-11-20",
   ]);
   assert.equal(addDays("2026-11-21", 10), "2026-12-01");
+});
+
+test("running net adds paychecks and subtracts that day's spending", () => {
+  const points = runningNet({
+    pay: { pay: 10000, cycle: "monthly", payday: "2026-11-01" },
+    spending: [{ date: "2026-11-02", amount: 2500 }],
+    subscriptions: [
+      { name: "Music", amount: 500, cycle: "monthly", anchor: "2026-11-03", status: "active" },
+    ],
+    income: [{ date: "2026-11-03", amount: 200 }],
+    month: "2026-11",
+    today: "2026-11-03",
+  });
+  assert.equal(points.length, 3);
+  assert.deepEqual(
+    points.map((p) => p.net),
+    [10000, 7500, 7200],
+  );
+});
+
+test("a repair keeps the split, cart, bills, goals and pay around a bad row", () => {
+  const fixed = salvageState({
+    version: 2,
+    settings: { currency: "EUR", theme: "dark" },
+    subscriptions: [
+      { id: "ok", name: "Music", amount: 999, cycle: "monthly", anchor: "2026-01-01", status: "active", usage: "daily" },
+      { id: "bad", name: "Broken", amount: "twelve", cycle: "monthly", anchor: "2026-01-01" },
+    ],
+    split: {
+      currency: "EUR",
+      members: [
+        { id: "a", name: "Alex", weight: 2 },
+        { name: "No id" },
+      ],
+      expenses: [
+        {
+          id: "e",
+          description: "Dinner",
+          date: "2026-02-02",
+          paidBy: "a",
+          amount: 2000,
+          split: { kind: "equal", among: ["a", "missing"] },
+        },
+        { id: "gone", description: "Nope", date: "yesterday", paidBy: "a", amount: 10, split: { kind: "equal", among: ["a"] } },
+      ],
+      payments: [{ id: "p", from: "a", to: "a", amount: 100, date: "2026-02-03" }],
+    },
+    cart: {
+      items: [
+        { id: "m", name: "Milk", unitPrice: 400, qty: 2, taxable: false, inBasket: true },
+        { id: "bad", name: "Bad", unitPrice: "x", qty: 1 },
+      ],
+      taxRateBps: 500,
+      budget: 8000,
+    },
+    budget: {
+      spending: [{ id: "s", date: "not-a-date", amount: 10, category: "Fun" }],
+      bills: [
+        {
+          id: "rent",
+          name: "Rent",
+          estimate: 10000,
+          cycle: "monthly",
+          anchor: "2026-03-01",
+          category: "Housing",
+          autopay: false,
+          leadDays: 3,
+          payments: [],
+        },
+      ],
+      goals: [{ id: "g", name: "Trip", target: 5000, saved: 100 }],
+      pay: { pay: 200000, cycle: "monthly", payday: "2026-04-01", balance: 5000, balanceOn: "2026-03-20", keepAside: 0 },
+      income: [{ id: "i", date: "2026-03-01", amount: 1500, note: "Gift", source: "manual" }],
+    },
+    sync: { owner: "ada", repo: "money", branch: "main", path: "data/subscriptions.json", encrypt: true },
+  });
+  assert.equal(fixed.subscriptions.length, 1);
+  assert.equal(fixed.split.currency, "EUR");
+  assert.equal(fixed.split.members.length, 2);
+  assert.equal(fixed.split.members[1].id.length > 0, true);
+  assert.equal(fixed.split.expenses.length, 1);
+  assert.deepEqual(fixed.split.expenses[0].split.among, ["a"]);
+  assert.equal(fixed.split.payments.length, 1);
+  assert.equal(fixed.cart.items.length, 1);
+  assert.equal(fixed.cart.items[0].name, "Milk");
+  assert.equal(fixed.cart.taxRateBps, 500);
+  assert.equal(fixed.budget.spending.length, 0);
+  assert.equal(fixed.budget.bills[0].name, "Rent");
+  assert.equal(fixed.budget.goals[0].name, "Trip");
+  assert.equal(fixed.budget.pay.pay, 200000);
+  assert.equal(fixed.budget.income[0].note, "Gift");
+  assert.equal(fixed.sync.owner, "ada");
+  assert.equal(fixed.sync.encrypt, true);
 });
 
 test("a broken save can be salvaged without dropping the readable rows", () => {

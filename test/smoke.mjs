@@ -100,6 +100,64 @@ try {
     await context.close();
     console.log(name, "ok");
   }
+
+  const arabic = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    locale: "ar",
+  });
+  const arPage = await arabic.newPage();
+  await arPage.addInitScript(() => localStorage.setItem("tally:lang", "ar"));
+  await arPage.goto(base + "#/today", { waitUntil: "domcontentloaded" });
+  await arPage.waitForTimeout(600);
+  const dir = await arPage.evaluate(() => document.documentElement.dir);
+  const heading = await arPage.locator("h2").first().innerText();
+  if (dir !== "rtl") failures.push(`arabic dir is ${dir}`);
+  if (!heading.includes("اليوم")) failures.push(`arabic heading is ${heading}`);
+  const chart = await arPage.locator(".run-fig").count();
+  if (!chart) failures.push("arabic today is missing the running total");
+  await arabic.close();
+  console.log("arabic rtl ok");
+
+  const repair = await browser.newContext({ viewport: { width: 1200, height: 800 }, locale: "en-US" });
+  const repairPage = await repair.newPage();
+  await repairPage.addInitScript(() => {
+    localStorage.setItem("tally:lang", "en");
+    localStorage.setItem(
+      "tally:v2",
+      JSON.stringify({
+        version: 2,
+        subscriptions: [{ id: "bad", name: "Broken", amount: "nope", cycle: "monthly", anchor: "2026-01-01" }],
+        split: {
+          currency: "USD",
+          members: [{ id: "a", name: "Alex Kept", weight: 1 }],
+          expenses: [],
+          payments: [],
+        },
+        budget: {
+          bills: [
+            {
+              id: "rent",
+              name: "Rent Kept",
+              estimate: 10000,
+              cycle: "monthly",
+              anchor: "2026-03-01",
+              payments: [],
+            },
+          ],
+        },
+      }),
+    );
+  });
+  await repairPage.goto(base + "#/split", { waitUntil: "domcontentloaded" });
+  await repairPage.waitForTimeout(500);
+  const splitText = await repairPage.locator("#app").innerText();
+  if (!splitText.includes("Alex Kept")) failures.push("repair dropped the split group");
+  await repairPage.goto(base + "#/budget");
+  await repairPage.waitForTimeout(300);
+  const budgetText = await repairPage.locator("#app").innerText();
+  if (!budgetText.includes("Rent Kept")) failures.push("repair dropped the bill");
+  await repair.close();
+  console.log("repair ok");
 } finally {
   await browser.close();
   server.close();
