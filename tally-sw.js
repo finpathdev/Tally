@@ -12,8 +12,8 @@
  *   versioned files from jsDelivr are cached after the first scan so
  *   scanning also works offline. No photo or personal data is ever sent.
  */
-const VERSION = '0928f1cb1a03';
-const PRECACHE = ["./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
+const VERSION = '20261121levelup';
+const PRECACHE = ["./tally-core.mjs","./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
 const CACHE = `tally-${VERSION}`;
 // Kept across app updates: the files are versioned in their URLs.
 const OCR_CACHE = 'ocr-v1';
