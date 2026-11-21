@@ -4,7 +4,7 @@
 
 **Know where every dollar goes, and keep the ones you don't need.**
 
-<img src="tally-preview.png" alt="Tally's Budget tab on desktop and phone: monthly budgets, savings goals and spending insights" width="100%">
+<img src="tally-preview.png" alt="Tally's Today tab on desktop and phone: safe to spend until payday, and this month's money in versus money out" width="100%">
 
 </div>
 
@@ -12,11 +12,13 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 | | |
 | :-- | :-- |
+| **Today** | The first screen. What's safe to spend until payday, this month's money in against money out, the next week of bills and renewals, and any budget that's running hot. |
 | **Subscriptions** | Every recurring charge, what it really costs, when it renews, and which ones to cancel. Finds forgotten ones in a bank export. |
 | **Split** | Shared costs split equally, by income, by shares or exact amounts, settled in the fewest possible payments. |
 | **Cart** | A shopping list with the real total, tax included, and a budget meter. |
 | **Safe to spend** | One number: what you can spend each day until payday, after the bills and subscriptions due before then. |
-| **Budget** | Monthly budgets, savings goals, bills with due dates and reminders, charts of where your money goes, and saving tips. |
+| **Budget** | Monthly budgets with optional rollover, savings goals, bills, charts, search across your spending, and saving tips. |
+| **Bank import** | Drop a CSV. Tally reads comma, semicolon and tab files, US and day-first dates, debits and deposits, guesses a category, and points out charges that look like subscriptions. You review them before anything is saved. |
 | **Receipt scanning** | Photograph a receipt. It's read on your device (never uploaded) and turned into spending, cart items, or a split item by item. |
 | **Move to another device** | Send everything from your computer to your phone with a moving QR code, a file or a link, encrypted with a one-time code. |
 | **Languages** | Asks “What language do you speak?” on the first visit, with 100+ languages and a search box. Built in: English, Spanish, Hindi, French, Portuguese, German, Chinese, Arabic (right-to-left), Bengali, Telugu and Tamil. Others are translated on the device where the browser can, or with the browser’s own Translate. Change or reset it any time with the language button at the top. |
@@ -26,19 +28,21 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 It installs like an app (click **Get the app**: there's a QR code to open it on your phone, and steps for iPhone, Android and computers), works offline, and has light and dark themes.
 
-This is the **one-file version**: the whole app is in `index.html`, and everything else sits next to it in the same folder.
+Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. New strings are in English until a language pack is rebuilt; every other language still falls back to that English.
 
 ## Files
 
 | File | What it is |
 | :-- | :-- |
-| `index.html` | The entire app: all code, styles and built-in languages (compressed so it loads fast). Open it in a browser to use it. |
+| `index.html` | The app: screens, styles and built-in languages. Open it in a browser to use it. |
+| `tally-core.mjs` | The money math, loaded by the page and precached for offline use. |
 | `tally-icon.svg`, `tally-icon-192.png`, `tally-icon-512.png`, `tally-icon-maskable-512.png`, `tally-apple-touch-icon.png` | The logo in the sizes browsers and phones need |
 | `tally-gloock.woff2`, `tally-hanken-grotesk.woff2`, `tally-martian-mono.woff2` | The three fonts |
 | `tally-manifest.webmanifest` | Lets people install Tally as an app |
 | `tally-sw.js` | Makes Tally work offline and handles reminders |
 | `tally-renewal-check.mjs` | Optional: powers email alerts before renewals (see below) |
 | `tally-preview.png` | The picture at the top of this page. Also use it as the repository's social preview (see below) |
+| `test/` | Checks for the money math, and a browser smoke test of every tab |
 
 ## Put it on GitHub Pages
 
@@ -64,11 +68,23 @@ The **Send feedback** and **Report a problem** links at the bottom of the app op
 
 On GitHub, open **Settings → General**, scroll to **Social preview**, click **Edit → Upload an image**, and choose `tally-preview.png`. Links to the repository then show that picture.
 
+## Tests
+
+From this folder, with Node installed:
+
+```
+npm install
+npm test
+npm run test:smoke
+```
+
+`npm test` checks safe to spend, split settlement, cart tax, rollover, and bank CSV parsing. The smoke test opens every tab at desktop and phone width and fails if the console reports an error. It uses Chrome if `CHROME` is set, otherwise `/usr/bin/google-chrome`.
+
 ## Edit it
 
-`index.html` is generated and minified (squeezed onto a few long lines) so the site loads quickly, which makes it hard to edit by hand. To change Tally, edit the readable source in the full project (`tally.zip`, folder `src/`), then run `npm run build:site` to make a new set of these files and upload them again.
+`tally-core.mjs` is the readable money math. `index.html` is minified so the site loads quickly, which makes the screens harder to edit by hand. Open `index.html` straight from your computer to try a change. Offline mode and the install button only work once it's on your website (https).
 
-You can open `index.html` straight from your computer to try it. Offline mode and the install button only work once it's on your website (https).
+Uploading a new `index.html` or `tally-core.mjs` also needs the matching `tally-sw.js`. The service worker's `VERSION` has to change or phones keep the previous copy.
 
 ## Optional: email alerts before renewals
 

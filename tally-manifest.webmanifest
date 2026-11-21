@@ -1,9 +1,9 @@
 {
   "id": "./",
-  "name": "Tally: subscriptions, splits & cart",
+  "name": "Tally: safe to spend, budgets & splits",
   "short_name": "Tally",
-  "description": "Track subscriptions, split shared costs fairly and total your cart with tax. Everything stays on your device.",
-  "start_url": "./#/subscriptions",
+  "description": "See what's safe to spend until payday, track subscriptions, split shared costs and total your cart with tax. Everything stays on your device.",
+  "start_url": "./#/today",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
@@ -43,6 +43,17 @@
     }
   ],
   "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "url": "./#/today",
+      "icons": [
+        {
+          "src": "tally-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
     {
       "name": "Add subscription",
       "short_name": "Add sub",
