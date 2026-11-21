@@ -15,6 +15,10 @@ import {
   paydaysBetween,
   rolloverCarry,
   runningNet,
+  attentionItems,
+  dueReminders,
+  yearReview,
+  icsCalendar,
   safeToSpend,
   salvageState,
   settle,
@@ -46,7 +50,7 @@ test("safe to spend matches the sample month of 21 Nov 2026", () => {
       subscriptions: subs,
       bills: [
         { name: "Rent", estimate: 110000, cycle: "monthly", anchor: "2026-12-02", autopay: false, payments: [] },
-        { name: "Electricity", estimate: 7200, cycle: "monthly", anchor: "2026-12-14", autopay: false, payments: [] },
+        { name: "Electricity", estimate: 7200, cycle: "monthly", anchor: "2026-11-18", autopay: false, payments: [] },
         { name: "Phone plan", estimate: 4500, cycle: "monthly", anchor: "2026-11-28", autopay: true, payments: [] },
       ],
     },
@@ -55,9 +59,9 @@ test("safe to spend matches the sample month of 21 Nov 2026", () => {
   assert.equal(result.nextPayday, "2026-12-01");
   assert.equal(result.daysLeft, 10);
   assert.equal(result.spentSince, 4965);
-  assert.equal(result.owedTotal, 4500 + 1299 + 2499 + 4500);
-  assert.equal(result.safe, 118237);
-  assert.equal(result.perDay, 11823);
+  assert.equal(result.owedTotal, 4500 + 1299 + 2499 + 4500 + 7200);
+  assert.equal(result.safe, 111037);
+  assert.equal(result.perDay, 11103);
   assert.equal(result.level, "ok");
 });
 
@@ -268,6 +272,79 @@ test("running net adds paychecks and subtracts that day's spending", () => {
     points.map((p) => p.net),
     [10000, 7500, 7200],
   );
+});
+
+test("reminders honor lead time, include overdue bills, and skip snoozed ones", () => {
+  const items = attentionItems({
+    today: "2026-11-21",
+    snoozed: { "bill:phone:2026-11-28": "2026-11-25" },
+    subscriptions: [
+      { id: "gym", name: "Gym", amount: 4500, cycle: "monthly", anchor: "2026-11-22", status: "active", leadDays: 5 },
+      { id: "later", name: "Later", amount: 1000, cycle: "monthly", anchor: "2026-12-20", status: "active", leadDays: 3 },
+    ],
+    bills: [
+      { id: "rent", name: "Rent", estimate: 110000, cycle: "monthly", anchor: "2026-11-02", leadDays: 5, payments: [], autopay: false },
+      { id: "phone", name: "Phone", estimate: 4500, cycle: "monthly", anchor: "2026-11-28", leadDays: 2, payments: [], autopay: false },
+    ],
+  });
+  const rent = items.find((item) => item.name === "Rent");
+  const gym = items.find((item) => item.name === "Gym");
+  assert.equal(rent.state, "overdue");
+  assert.equal(rent.date, "2026-11-02");
+  assert.equal(gym.state, "soon");
+  assert.equal(gym.date, "2026-11-22");
+  assert.equal(items.some((item) => item.name === "Phone"), false);
+  assert.equal(items.some((item) => item.name === "Later"), false);
+  const due = dueReminders(
+    [
+      { key: "a", notifyOn: "2026-11-18", date: "2026-11-21" },
+      { key: "b", notifyOn: "2026-11-19", date: "2026-11-10" },
+      { key: "c", notifyOn: "2026-11-22", date: "2026-11-25" },
+      { key: "d", notifyOn: "2026-11-01", date: "2026-11-02", },
+    ],
+    "2026-11-21",
+    { notified: ["d"], snoozed: { b: "2026-11-30" } },
+  );
+  assert.deepEqual(due.map((item) => item.key), ["a"]);
+});
+
+test("a year review totals categories, merchants, and money in versus out", () => {
+  const review = yearReview({
+    year: "2026",
+    pay: { pay: 100000, cycle: "monthly", payday: "2026-01-01" },
+    income: [{ date: "2026-03-15", amount: 5000 }],
+    subscriptions: [
+      { name: "Music", amount: 1000, cycle: "monthly", anchor: "2026-01-05", status: "active" },
+    ],
+    spending: [
+      { date: "2026-01-10", amount: 4000, category: "Groceries", note: "TESCO STORES 1234" },
+      { date: "2026-01-20", amount: 2000, category: "Groceries", note: "TESCO STORES #99" },
+      { date: "2026-02-10", amount: 9000, category: "Groceries", note: "LIDL" },
+    ],
+    goals: [{ name: "Trip", target: 10000, saved: 2500 }],
+  });
+  assert.equal(review.moneyIn, 100000 * 12 + 5000);
+  assert.equal(review.subscriptionsAnnual, 12000);
+  assert.equal(review.categories.find((row) => row.category === "Groceries").amount, 15000);
+  assert.equal(review.categories.find((row) => row.category === "Subscriptions").amount, 12000);
+  const tesco = review.merchants.find((row) => row.name === "Tesco Stores");
+  assert.equal(tesco.amount, 6000);
+  assert.equal(tesco.count, 2);
+  assert.equal(review.goals[0].pct, 0.25);
+  const feb = review.changes.find((row) => row.month === "2026-02" && row.category === "Groceries");
+  assert.equal(feb.delta, 3000);
+  assert.equal(review.net, review.moneyIn - review.moneyOut);
+  const ics = icsCalendar(
+    [
+      { uid: "rent-1", date: "2026-12-02", summary: "Rent", description: "Bill", rrule: "FREQ=MONTHLY", alarmDays: 5 },
+    ],
+    { includeAmounts: false },
+  );
+  assert.match(ics, /BEGIN:VEVENT/);
+  assert.match(ics, /SUMMARY:Rent/);
+  assert.match(ics, /TRIGGER:-P5D/);
+  assert.match(ics, /RRULE:FREQ=MONTHLY/);
+  assert.doesNotMatch(ics, /110000/);
 });
 
 test("a repair keeps the split, cart, bills, goals and pay around a bad row", () => {

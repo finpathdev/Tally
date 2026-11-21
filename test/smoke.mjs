@@ -47,7 +47,7 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;
 const base = `http://127.0.0.1:${port}/`;
 
-const tabs = ["today", "subscriptions", "split", "cart", "budget", "alternatives", "sync", "help"];
+const tabs = ["today", "subscriptions", "split", "cart", "budget", "alternatives", "sync", "year", "help"];
 const widths = [
   ["desktop", 1440, 900],
   ["mobile", 390, 844],
@@ -68,6 +68,7 @@ try {
       locale: "en-US",
       reducedMotion: "reduce",
     });
+    await context.addInitScript(() => localStorage.setItem("tally:lang", "en"));
     const page = await context.newPage();
     const logs = [];
     page.on("console", (msg) => {
@@ -95,6 +96,36 @@ try {
     );
     if (!today.includes("Safe to spend") && !today.includes("SAFE TO SPEND")) {
       failures.push(`${name}: Today is missing safe to spend`);
+    }
+    if (name === "desktop") {
+      const dueCard = page.locator(".due-card");
+      const dueText = await dueCard.innerText();
+      if (!dueText.includes("Due and overdue")) failures.push("today is missing the due list");
+      if (!dueText.includes("Overdue") || !dueText.includes("Electricity")) {
+        failures.push("today is missing the overdue electricity bill");
+      }
+      if (!dueText.includes("Gym Membership")) failures.push("today is missing the gym reminder inside its lead time");
+      await dueCard.getByRole("button", { name: "Mark paid" }).first().click();
+      await page.waitForTimeout(250);
+      const paid = await dueCard.innerText();
+      if (paid.includes("Electricity")) failures.push("mark paid left Electricity on Today");
+      const snooze = dueCard.getByRole("button", { name: "Snooze 7 days" }).first();
+      const name = (await snooze.locator("xpath=ancestor::li").innerText()).split("\n")[0];
+      await snooze.click();
+      await page.waitForTimeout(250);
+      const dueAfter = await dueCard.innerText();
+      if (dueAfter.includes(name)) failures.push(`snooze left ${name} on Today`);
+      await page.goto(base + "#/year", { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(200);
+      const year = await page.locator("#app").innerText();
+      if (!year.includes("Year in Tally") || !year.includes("Where it went") || !year.includes("By month")) {
+        failures.push("year review is missing its sections");
+      }
+      if (year.includes("Top places")) failures.push("year review showed merchant names before they were asked for");
+      await page.getByRole("checkbox", { name: "Include names" }).check();
+      await page.waitForTimeout(150);
+      const named = await page.locator("#app").innerText();
+      if (!named.includes("Top places")) failures.push("include names did not reveal merchants");
     }
     if (logs.length) failures.push(`${name} console: ${logs.join(" | ")}`);
     await context.close();

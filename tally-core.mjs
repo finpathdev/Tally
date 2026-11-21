@@ -1224,6 +1224,252 @@ export function salvageState(input) {
   };
 }
 
+function paidDue(bill, date) {
+  return (bill.payments || []).some((p) => p.due === date);
+}
+
+/** Bills and renewals that should be on screen or in a notification. */
+export function attentionItems({ subscriptions = [], bills = [], today, snoozed = {} }) {
+  const items = [];
+  const hidden = (key) => snoozed[key] && snoozed[key] > today;
+  for (const bill of bills) {
+    const lead = Math.max(0, bill.leadDays || 0);
+    const from = addDays(today, -45);
+    const to = addDays(today, lead);
+    for (const date of occurrences(bill.anchor, bill.cycle || "monthly", from, to)) {
+      if (paidDue(bill, date)) continue;
+      const key = `bill:${bill.id}:${date}`;
+      if (hidden(key)) continue;
+      const days = daysBetween(today, date);
+      if (days > lead) continue;
+      items.push({
+        key,
+        kind: "bill",
+        id: bill.id,
+        name: bill.name,
+        date,
+        amount: bill.estimate,
+        leadDays: lead,
+        autopay: !!bill.autopay,
+        category: bill.category || "Bills",
+        state: days < 0 ? "overdue" : days === 0 ? "due" : "soon",
+        days,
+      });
+    }
+  }
+  for (const sub of subscriptions) {
+    if (sub.status === "paused") continue;
+    const lead = Math.max(0, sub.leadDays || 0);
+    const to = addDays(today, lead);
+    if (sub.status === "trial" && isIsoDate(sub.trialEnds) && sub.trialEnds >= today && sub.trialEnds <= to) {
+      const key = `${sub.id}:trial:${sub.trialEnds}`;
+      if (!hidden(key)) {
+        const days = daysBetween(today, sub.trialEnds);
+        items.push({
+          key,
+          kind: "trial",
+          id: sub.id,
+          name: sub.name,
+          date: sub.trialEnds,
+          amount: sub.amount,
+          leadDays: lead,
+          state: days === 0 ? "due" : "soon",
+          days,
+        });
+      }
+    }
+    for (const charge of chargesBetween([sub], today, to)) {
+      if (sub.status === "trial" && sub.trialEnds && charge.date <= sub.trialEnds) continue;
+      const key = `${sub.id}:${charge.date}`;
+      if (hidden(key)) continue;
+      const days = daysBetween(today, charge.date);
+      items.push({
+        key,
+        kind: "subscription",
+        id: sub.id,
+        name: sub.name,
+        date: charge.date,
+        amount: charge.amount,
+        leadDays: lead,
+        state: days === 0 ? "due" : "soon",
+        days,
+      });
+    }
+  }
+  const rank = { overdue: 0, due: 1, soon: 2 };
+  return items.sort(
+    (a, b) => rank[a.state] - rank[b.state] || a.date.localeCompare(b.date) || a.name.localeCompare(b.name),
+  );
+}
+
+/** Which stored reminders should notify today, including recent overdue ones. */
+export function dueReminders(schedule, today, { notified = [], snoozed = {} } = {}) {
+  const seen = new Set(notified);
+  const oldest = addDays(today, -45);
+  return (schedule || []).filter((item) => {
+    const until = snoozed[item.key];
+    if (until && until > today) return false;
+    if (seen.has(item.key)) return false;
+    if (!item.notifyOn || item.notifyOn > today) return false;
+    if (!item.date || item.date < oldest) return false;
+    return true;
+  });
+}
+
+export function yearReview({
+  spending = [],
+  subscriptions = [],
+  income = [],
+  pay = null,
+  goals = [],
+  year,
+}) {
+  const y = String(year);
+  const months = [];
+  const catTotals = new Map();
+  for (let m = 1; m <= 12; m++) {
+    const month = `${y}-${String(m).padStart(2, "0")}`;
+    const start = `${month}-01`;
+    const end = monthEnd(month);
+    const byCategory = new Map();
+    let out = 0;
+    for (const row of spending) {
+      if (!row.date || row.date.slice(0, 7) !== month) continue;
+      out += row.amount;
+      byCategory.set(row.category, (byCategory.get(row.category) || 0) + row.amount);
+    }
+    let subSum = 0;
+    for (const charge of chargesBetween(
+      subscriptions.filter((sub) => sub.status !== "paused"),
+      start,
+      end,
+    )) {
+      subSum += charge.amount;
+      out += charge.amount;
+      byCategory.set("Subscriptions", (byCategory.get("Subscriptions") || 0) + charge.amount);
+    }
+    let inn = 0;
+    for (const row of income) if (row.date && row.date.slice(0, 7) === month) inn += row.amount;
+    if (pay) inn += paydaysBetween(pay, start, end).length * pay.pay;
+    for (const [category, amount] of byCategory) {
+      catTotals.set(category, (catTotals.get(category) || 0) + amount);
+    }
+    months.push({
+      month,
+      moneyIn: inn,
+      moneyOut: out,
+      net: inn - out,
+      subscriptions: subSum,
+      byCategory: [...byCategory.entries()]
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a, b) => b.amount - a.amount),
+    });
+  }
+  const changes = [];
+  for (let i = 1; i < months.length; i++) {
+    const prev = new Map(months[i - 1].byCategory.map((row) => [row.category, row.amount]));
+    const cur = new Map(months[i].byCategory.map((row) => [row.category, row.amount]));
+    for (const name of new Set([...prev.keys(), ...cur.keys()])) {
+      const delta = (cur.get(name) || 0) - (prev.get(name) || 0);
+      if (delta !== 0) {
+        changes.push({
+          category: name,
+          month: months[i].month,
+          delta,
+          from: prev.get(name) || 0,
+          to: cur.get(name) || 0,
+        });
+      }
+    }
+  }
+  changes.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const merchants = new Map();
+  for (const row of spending) {
+    if (!row.date || row.date.slice(0, 4) !== y) continue;
+    const name = normalizeMerchant(row.note || "") || row.category || "Other";
+    const cur = merchants.get(name) || { name, amount: 0, count: 0 };
+    cur.amount += row.amount;
+    cur.count += 1;
+    merchants.set(name, cur);
+  }
+  let subscriptionsAnnual = 0;
+  for (const sub of subscriptions) {
+    if (sub.status === "paused") continue;
+    const mult = { weekly: 52, monthly: 12, quarterly: 4, annual: 1 }[sub.cycle] || 0;
+    subscriptionsAnnual += sub.amount * mult;
+  }
+  const moneyIn = months.reduce((sum, month) => sum + month.moneyIn, 0);
+  const moneyOut = months.reduce((sum, month) => sum + month.moneyOut, 0);
+  return {
+    year: y,
+    months,
+    categories: [...catTotals.entries()]
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount),
+    changes: changes.slice(0, 6),
+    merchants: [...merchants.values()].sort((a, b) => b.amount - a.amount).slice(0, 8),
+    subscriptionsAnnual,
+    goals: (goals || []).map((goal) => ({
+      name: goal.name,
+      saved: goal.saved || 0,
+      target: goal.target || 0,
+      pct: goal.target > 0 ? Math.min(1, (goal.saved || 0) / goal.target) : 0,
+    })),
+    moneyIn,
+    moneyOut,
+    net: moneyIn - moneyOut,
+  };
+}
+
+function icsEscape(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
+/** A calendar file for renewals and bills. Amounts are omitted unless includeAmounts is set. */
+export function icsCalendar(events, { name = "Tally", includeAmounts = false } = {}) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Tally//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    `X-WR-CALNAME:${icsEscape(name)}`,
+  ];
+  for (const event of events) {
+    const summary = includeAmounts && event.amountLabel ? `${event.summary} · ${event.amountLabel}` : event.summary;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${icsEscape(event.uid)}@tally`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${String(event.date).replace(/-/g, "")}`,
+    );
+    if (event.rrule) lines.push(`RRULE:${event.rrule}`);
+    lines.push(
+      `SUMMARY:${icsEscape(summary)}`,
+      `DESCRIPTION:${icsEscape(event.description || "")}`,
+      "TRANSP:TRANSPARENT",
+    );
+    const alarm = Math.max(0, event.alarmDays || 0);
+    if (alarm > 0) {
+      lines.push(
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        `DESCRIPTION:${icsEscape(summary)}`,
+        `TRIGGER:-P${alarm}D`,
+        "END:VALARM",
+      );
+    }
+    lines.push("END:VEVENT");
+  }
+  lines.push("END:VCALENDAR");
+  return `${lines.join("\r\n")}\r\n`;
+}
+
 globalThis.TallyCore = {
   safeToSpend,
   allocate,
@@ -1244,5 +1490,9 @@ globalThis.TallyCore = {
   paydaysBetween,
   runningNet,
   monthEnd,
+  attentionItems,
+  dueReminders,
+  yearReview,
+  icsCalendar,
   addDays,
 };
