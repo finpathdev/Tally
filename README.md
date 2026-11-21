@@ -28,7 +28,7 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 It installs like an app (click **Get the app**: there's a QR code to open it on your phone, and steps for iPhone, Android and computers), works offline, and has light and dark themes.
 
-Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. New strings are in English until a language pack is rebuilt; every other language still falls back to that English.
+Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, the running total, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. The ten built-in languages include Today, rollover, search, the import review, and the empty states. Arabic lays the screen out from right to left.
 
 ## Files
 
@@ -36,6 +36,7 @@ Tally is a static folder. The app lives in `index.html`. The money math (safe to
 | :-- | :-- |
 | `index.html` | The app: screens, styles and built-in languages. Open it in a browser to use it. |
 | `tally-core.mjs` | The money math, loaded by the page and precached for offline use. |
+| `lang-extra.mjs` | Translations for the newer sentences, packed into `index.html` |
 | `tally-icon.svg`, `tally-icon-192.png`, `tally-icon-512.png`, `tally-icon-maskable-512.png`, `tally-apple-touch-icon.png` | The logo in the sizes browsers and phones need |
 | `tally-gloock.woff2`, `tally-hanken-grotesk.woff2`, `tally-martian-mono.woff2` | The three fonts |
 | `tally-manifest.webmanifest` | Lets people install Tally as an app |
@@ -78,7 +79,7 @@ npm test
 npm run test:smoke
 ```
 
-`npm test` checks safe to spend, split settlement, cart tax, rollover, and bank CSV parsing. The smoke test opens every tab at desktop and phone width and fails if the console reports an error. It uses Chrome if `CHROME` is set, otherwise `/usr/bin/google-chrome`.
+`npm test` checks safe to spend, split settlement, cart tax, rollover, the running total, bank CSV parsing, and that every new sentence is translated in the ten built-in languages. The smoke test opens every tab at desktop and phone width, checks Arabic is right to left, and checks a damaged save keeps the split and the bills. It fails if the console reports an error. It uses Chrome if `CHROME` is set, otherwise `/usr/bin/google-chrome`.
 
 ## Edit it
 

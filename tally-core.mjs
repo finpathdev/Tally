@@ -156,6 +156,30 @@ export function nextPaydayAfter(pay, on) {
   return found[0];
 }
 
+/**
+ * Cumulative money in minus money out, one point per day through today
+ * (or through the end of a past month).
+ */
+export function runningNet({ pay, spending, subscriptions, income, month, today }) {
+  const start = `${month}-01`;
+  const endCap = monthEnd(month);
+  const end = today.slice(0, 7) === month && today < endCap ? today : endCap;
+  const paydaySet = new Set(pay ? paydaysBetween(pay, start, end) : []);
+  const points = [];
+  let net = 0;
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    let inn = paydaySet.has(date) ? pay.pay : 0;
+    for (const row of income || []) if (row.date === date) inn += row.amount;
+    let out = 0;
+    for (const row of spending || []) if (row.date === date) out += row.amount;
+    out += chargesBetween(subscriptions || [], date, date).reduce((sum, row) => sum + row.amount, 0);
+    net += inn - out;
+    points.push({ date, inn, out, net });
+    if (points.length > 40) break;
+  }
+  return points;
+}
+
 export function paydaysBetween(pay, start, end) {
   if (!pay) return [];
   const out = [];
@@ -922,9 +946,207 @@ function keepString(value, fallback, max = 80) {
  * Best-effort recovery when a saved file fails strict validation.
  * Drops broken rows instead of throwing away the whole file.
  */
+const CYCLES = ["weekly", "monthly", "quarterly", "annual"];
+const SOURCES = ["manual", "receipt", "bank", "cart", "bill"];
+
+function salvageSplitKind(split, ids) {
+  if (!split || typeof split !== "object") return null;
+  if (split.kind === "equal" || split.kind === "weighted") {
+    const among = Array.isArray(split.among)
+      ? split.among.filter((id) => typeof id === "string" && ids.has(id))
+      : [];
+    return among.length ? { kind: split.kind, among } : null;
+  }
+  if (split.kind === "shares" && split.shares && typeof split.shares === "object") {
+    const shares = {};
+    for (const [id, value] of Object.entries(split.shares)) {
+      const n = Number(value);
+      if (ids.has(id) && Number.isFinite(n) && n > 0) shares[id] = n;
+    }
+    return Object.keys(shares).length ? { kind: "shares", shares } : null;
+  }
+  if (split.kind === "exact" && split.amounts && typeof split.amounts === "object") {
+    const amounts = {};
+    for (const [id, value] of Object.entries(split.amounts)) {
+      const n = cents(value);
+      if (ids.has(id) && n !== null && n >= 0) amounts[id] = n;
+    }
+    return Object.keys(amounts).length ? { kind: "exact", amounts } : null;
+  }
+  return null;
+}
+
+function salvageSplit(split) {
+  const src = split && typeof split === "object" ? split : {};
+  const members = [];
+  const ids = new Set();
+  for (const row of Array.isArray(src.members) ? src.members : []) {
+    if (!row || typeof row !== "object" || typeof row.name !== "string" || !row.name) continue;
+    const weight = Number(row.weight ?? 1);
+    if (!Number.isFinite(weight) || weight < 0) continue;
+    const id = keepString(row.id, `m${members.length}`, 40);
+    if (ids.has(id)) continue;
+    ids.add(id);
+    members.push({ id, name: keepString(row.name, "Person", 80), weight });
+  }
+  const expenses = [];
+  for (const row of Array.isArray(src.expenses) ? src.expenses : []) {
+    const amount = row && cents(row.amount);
+    if (!row || typeof row.description !== "string" || !row.description) continue;
+    if (amount === null || amount < 0 || !isIsoDate(row.date) || !ids.has(row.paidBy)) continue;
+    const kind = salvageSplitKind(row.split, ids);
+    if (!kind) continue;
+    const item = {
+      id: keepString(row.id, `x${expenses.length}`, 40),
+      description: keepString(row.description, "Expense", 140),
+      date: row.date,
+      paidBy: row.paidBy,
+      amount,
+      split: kind,
+    };
+    if (row.original && typeof row.original === "object") {
+      const currency = keepString(row.original.currency, "", 8);
+      const originalAmount = cents(row.original.amount);
+      const rate = Number(row.original.rate);
+      if (currency && originalAmount !== null && originalAmount >= 0 && Number.isFinite(rate) && rate > 0) {
+        item.original = { currency, amount: originalAmount, rate };
+      }
+    }
+    expenses.push(item);
+  }
+  const payments = [];
+  for (const row of Array.isArray(src.payments) ? src.payments : []) {
+    const amount = row && cents(row.amount);
+    if (!row || amount === null || amount < 0 || !isIsoDate(row.date)) continue;
+    if (!ids.has(row.from) || !ids.has(row.to)) continue;
+    payments.push({
+      id: keepString(row.id, `p${payments.length}`, 40),
+      from: row.from,
+      to: row.to,
+      amount,
+      date: row.date,
+    });
+  }
+  return {
+    currency: keepString(src.currency, "USD", 8) || "USD",
+    members,
+    expenses,
+    payments,
+  };
+}
+
+function salvageCart(cart) {
+  const src = cart && typeof cart === "object" ? cart : {};
+  const items = [];
+  for (const row of Array.isArray(src.items) ? src.items : []) {
+    const unitPrice = row && cents(row.unitPrice);
+    const qty = row && cents(row.qty);
+    if (!row || typeof row.name !== "string" || !row.name) continue;
+    if (unitPrice === null || unitPrice < 0 || qty === null || qty < 1) continue;
+    items.push({
+      id: keepString(row.id, `c${items.length}`, 40),
+      name: keepString(row.name, "Item", 80),
+      unitPrice,
+      qty,
+      taxable: !!row.taxable,
+      inBasket: !!row.inBasket,
+    });
+  }
+  const tax = cents(src.taxRateBps);
+  const budget = cents(src.budget);
+  return {
+    items,
+    taxRateBps: tax !== null && tax >= 0 && tax <= 3000 ? tax : 825,
+    budget: budget !== null && budget >= 0 ? budget : 10000,
+  };
+}
+
+function salvageBills(rows) {
+  const bills = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const estimate = row && cents(row.estimate);
+    if (!row || typeof row.name !== "string" || !row.name || estimate === null || estimate < 0) continue;
+    if (!isIsoDate(row.anchor)) continue;
+    const payments = [];
+    for (const pay of Array.isArray(row.payments) ? row.payments : []) {
+      const amount = pay && cents(pay.amount);
+      if (!pay || amount === null || amount < 0 || !isIsoDate(pay.due) || !isIsoDate(pay.paidOn)) continue;
+      const item = { due: pay.due, amount, paidOn: pay.paidOn };
+      if (typeof pay.spendId === "string") item.spendId = pay.spendId;
+      payments.push(item);
+    }
+    bills.push({
+      id: keepString(row.id, `b${bills.length}`, 40),
+      name: keepString(row.name, "Bill", 80),
+      estimate,
+      cycle: CYCLES.includes(row.cycle) ? row.cycle : "monthly",
+      anchor: row.anchor,
+      category: keepString(row.category, "Bills", 40),
+      autopay: !!row.autopay,
+      leadDays: Number.isInteger(row.leadDays) ? row.leadDays : 3,
+      payments,
+    });
+  }
+  return bills;
+}
+
+function salvageGoals(rows) {
+  const goals = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const target = row && cents(row.target);
+    const saved = row && cents(row.saved ?? 0);
+    if (!row || typeof row.name !== "string" || !row.name || target === null || target < 0) continue;
+    if (saved === null || saved < 0) continue;
+    const goal = {
+      id: keepString(row.id, `g${goals.length}`, 40),
+      name: keepString(row.name, "Goal", 80),
+      target,
+      saved,
+    };
+    if (row.by !== undefined && isIsoDate(row.by)) goal.by = row.by;
+    goals.push(goal);
+  }
+  return goals;
+}
+
+function salvagePay(pay) {
+  if (!pay || typeof pay !== "object") return null;
+  const amount = cents(pay.pay);
+  const balance = cents(pay.balance);
+  const keep = cents(pay.keepAside ?? 0);
+  if (amount === null || amount < 0 || balance === null || keep === null || keep < 0) return null;
+  if (!PAY_CYCLES.includes(pay.cycle) || !isIsoDate(pay.payday) || !isIsoDate(pay.balanceOn)) return null;
+  const out = {
+    pay: amount,
+    cycle: pay.cycle,
+    payday: pay.payday,
+    balance,
+    balanceOn: pay.balanceOn,
+    keepAside: keep,
+  };
+  if (Array.isArray(pay.counted)) out.counted = pay.counted.filter((id) => typeof id === "string");
+  return out;
+}
+
+function salvageIncome(rows) {
+  const income = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const amount = row && cents(row.amount);
+    if (!row || amount === null || amount < 0 || !isIsoDate(row.date)) continue;
+    income.push({
+      id: keepString(row.id, `i${income.length}`, 40),
+      date: row.date,
+      amount,
+      note: keepString(row.note, "", 140),
+      source: SOURCES.includes(row.source) ? row.source : "manual",
+    });
+  }
+  return income;
+}
+
 export function salvageState(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
-  const src = input.version === 2 ? input : input;
+  const src = input;
   const settings = src.settings && typeof src.settings === "object" ? src.settings : {};
   const currency = keepString(settings.currency, "USD", 8) || "USD";
   const theme = ["system", "light", "dark"].includes(settings.theme) ? settings.theme : "system";
@@ -934,20 +1156,13 @@ export function salvageState(input) {
     if (!row || typeof row !== "object") continue;
     const amount = cents(row.amount ?? row.cost);
     if (!row.name || amount === null || amount < 0) continue;
-    const cycle = ["weekly", "monthly", "quarterly", "annual"].includes(row.cycle)
-      ? row.cycle
-      : "monthly";
-    const anchor = isIsoDate(row.anchor)
-      ? row.anchor
-      : isIsoDate(row.date)
-        ? row.date
-        : null;
+    const anchor = isIsoDate(row.anchor) ? row.anchor : isIsoDate(row.date) ? row.date : null;
     if (!anchor) continue;
     subscriptions.push({
       id: keepString(row.id, `s${subscriptions.length}`, 40),
       name: keepString(row.name, "Untitled", 80),
       amount,
-      cycle,
+      cycle: CYCLES.includes(row.cycle) ? row.cycle : "monthly",
       anchor,
       category: keepString(row.category, "Other", 40),
       leadDays: Number.isInteger(row.leadDays) ? row.leadDays : 3,
@@ -976,40 +1191,34 @@ export function salvageState(input) {
       amount,
       category: keepString(row.category, "Other", 40),
       note: keepString(row.note, "", 140),
-      source: ["manual", "receipt", "bank", "cart", "bill"].includes(row.source)
-        ? row.source
-        : "manual",
+      source: SOURCES.includes(row.source) ? row.source : "manual",
     });
   }
+  const sync = src.sync && typeof src.sync === "object" ? src.sync : {};
   return {
     version: 2,
     settings: { currency, theme, highCost: highCost && highCost > 0 ? highCost : 2000 },
     subscriptions,
-    split: {
-      currency: "USD",
-      members: [],
-      expenses: [],
-      payments: [],
-    },
-    cart: { items: [], taxRateBps: 825, budget: 10000 },
+    split: salvageSplit(src.split),
+    cart: salvageCart(src.cart),
     budget: {
       spending,
       limits,
-      goals: [],
-      bills: [],
-      pay: null,
+      goals: salvageGoals(budgetSrc.goals),
+      bills: salvageBills(budgetSrc.bills),
+      pay: salvagePay(budgetSrc.pay),
       rollover: Array.isArray(budgetSrc.rollover)
         ? budgetSrc.rollover.filter((n) => typeof n === "string")
         : [],
-      income: [],
+      income: salvageIncome(budgetSrc.income),
     },
     alternatives: { shortlist: [] },
     sync: {
-      owner: "",
-      repo: "",
-      branch: "main",
-      path: "data/subscriptions.json",
-      encrypt: false,
+      owner: keepString(sync.owner, "", 80),
+      repo: keepString(sync.repo, "", 80),
+      branch: keepString(sync.branch, "main", 80) || "main",
+      path: keepString(sync.path, "data/subscriptions.json", 120) || "data/subscriptions.json",
+      encrypt: !!sync.encrypt,
     },
     _salvaged: true,
   };
@@ -1033,6 +1242,7 @@ globalThis.TallyCore = {
   detectRecurring,
   salvageState,
   paydaysBetween,
+  runningNet,
   monthEnd,
   addDays,
 };
