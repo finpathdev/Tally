@@ -19,6 +19,8 @@ import {
   dueReminders,
   yearReview,
   icsCalendar,
+  calendarRule,
+  htmlEscape,
   safeToSpend,
   salvageState,
   settle,
@@ -235,6 +237,34 @@ test("comma csv with debit and credit columns keeps both directions", () => {
   assert.equal(categorize(parsed.expenses[0].description), "Transport");
   assert.equal(parsed.income[0].description, "PAYCHECK");
   assert.equal(parsed.income[0].amount, 150000);
+});
+
+test("an amount column is kept when debit and credit cells are blank", () => {
+  const text = `Date,Description,Amount,Debit,Credit
+2026-01-02,Tesco,12.50,,
+2026-01-03,Payroll,,,200.00`;
+  const parsed = parseBankTable(splitCsv(text), "USD");
+  assert.equal(parsed.expenses.length, 1);
+  assert.equal(parsed.expenses[0].description, "Tesco");
+  assert.equal(parsed.expenses[0].amount, 1250);
+  assert.equal(parsed.income[0].amount, 20000);
+});
+
+test("a credit card column is not treated as money coming in", () => {
+  const text = `Date,Description,Amount,Credit Card
+2026-01-02,Netflix,15.99,Visa`;
+  const parsed = parseBankTable(splitCsv(text), "USD");
+  assert.equal(parsed.expenses.length, 1);
+  assert.equal(parsed.expenses[0].amount, 1599);
+  assert.equal(parsed.income.length, 0);
+});
+
+test("a bill on the 31st still has a calendar rule in short months", () => {
+  assert.match(calendarRule("monthly", "2026-01-31"), /BYSETPOS=-1/);
+  assert.match(calendarRule("monthly", "2026-01-31"), /BYMONTHDAY=28,29,30,31/);
+  assert.equal(calendarRule("annual", "2024-02-29"), "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1");
+  assert.equal(calendarRule("weekly", "2026-11-21"), "FREQ=WEEKLY");
+  assert.equal(htmlEscape(`<img src=x onerror=alert(1)> & "`), "&lt;img src=x onerror=alert(1)&gt; &amp; &quot;");
 });
 
 test("merchant names drop card noise", () => {
