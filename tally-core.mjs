@@ -668,10 +668,12 @@ const AMOUNT_RULES = [
   [/amount|betrag|umsatz|montant|importe/, 3],
 ];
 const DEBIT_RULES = [
-  [/debit|withdraw|money\s*out|outflow|paid\s*out/, 4],
+  [/^(debit|debits|withdrawal|withdrawals|money\s*out|outflow|paid\s*out)$/, 5],
+  [/\b(debit|withdrawals?|money\s*out|outflow|paid\s*out)\b(?!\s*cards?)/, 4],
 ];
 const CREDIT_RULES = [
-  [/credit|deposit|money\s*in|inflow|paid\s*in/, 4],
+  [/^(credit|credits|deposit|deposits|money\s*in|inflow|paid\s*in)$/, 5],
+  [/\b(credits?|deposits?|money\s*in|inflow|paid\s*in)\b(?!\s*cards?)/, 4],
 ];
 
 function bestColumn(headers, rules) {
@@ -791,7 +793,7 @@ export function parseBankTable(rows, currency = "USD") {
   const creditCol = bestColumn(headers, CREDIT_RULES);
   const distinctDebit = debitCol >= 0 && debitCol !== amountCol ? debitCol : -1;
   const distinctCredit = creditCol >= 0 && creditCol !== amountCol && creditCol !== distinctDebit ? creditCol : -1;
-  if (dateCol < 0 || descCol < 0 || (amountCol < 0 && distinctDebit < 0)) {
+  if (dateCol < 0 || descCol < 0 || (amountCol < 0 && distinctDebit < 0 && distinctCredit < 0)) {
     throw new Error("Could not find date, description and amount columns in this CSV.");
   }
   const body = rows.slice(headerAt + 1);
@@ -808,9 +810,15 @@ export function parseBankTable(rows, currency = "USD") {
     if (distinctDebit >= 0 || distinctCredit >= 0) {
       const debit = distinctDebit >= 0 ? parseMoney(row[distinctDebit] ?? "", currency) : null;
       const credit = distinctCredit >= 0 ? parseMoney(row[distinctCredit] ?? "", currency) : null;
-      if (debit) expenses.push({ date, description, amount: Math.abs(debit) });
-      else if (credit) income.push({ date, description, amount: Math.abs(credit) });
-      continue;
+      if (debit) {
+        expenses.push({ date, description, amount: Math.abs(debit) });
+        continue;
+      }
+      if (credit) {
+        income.push({ date, description, amount: Math.abs(credit) });
+        continue;
+      }
+      if (amountCol < 0) continue;
     }
     const amount = parseMoney(row[amountCol] ?? "", currency);
     if (!amount) continue;
@@ -1421,6 +1429,30 @@ export function yearReview({
   };
 }
 
+/** A recurring-calendar rule that still fires in short months. */
+export function calendarRule(cycle, anchor) {
+  const day = Number(String(anchor).slice(8, 10));
+  const month = String(anchor).slice(5, 7);
+  const last =
+    day > 28
+      ? `;BYMONTHDAY=${Array.from({ length: day - 27 }, (_, i) => 28 + i).join(",")};BYSETPOS=-1`
+      : "";
+  if (cycle === "weekly") return "FREQ=WEEKLY";
+  if (cycle === "quarterly") return `FREQ=MONTHLY;INTERVAL=3${last}`;
+  if (cycle === "annual") {
+    return day > 28 && month === "02" ? "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1" : "FREQ=YEARLY";
+  }
+  return `FREQ=MONTHLY${last}`;
+}
+
+export function htmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function icsEscape(value) {
   return String(value ?? "")
     .replace(/\\/g, "\\\\")
@@ -1494,5 +1526,7 @@ globalThis.TallyCore = {
   dueReminders,
   yearReview,
   icsCalendar,
+  calendarRule,
+  htmlEscape,
   addDays,
 };
