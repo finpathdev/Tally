@@ -12,9 +12,9 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 | | |
 | :-- | :-- |
-| **Today** | The first screen. What's safe to spend until payday, this month's money in against money out, bills that are due or overdue, and any budget that's running hot. |
+| **Today** | Choose sample data or set up your budget with your balance, payday, and upcoming bills. See what's safe to spend each day, this month's money in against money out, bills that are due or overdue, and any budget that's running hot. |
 | **Subscriptions** | Every recurring charge, what it really costs, when it renews, and which ones to cancel. Finds forgotten ones in a bank export. |
-| **Split** | Shared costs split equally, by income, by shares or exact amounts, settled in the fewest possible payments. |
+| **Split** | Shared costs split equally, by income, by shares or exact amounts, settled by minimizing payments for up to 16 people with nonzero balances and simplifying settlement for larger groups. |
 | **Cart** | A shopping list with the real total, tax included, and a budget meter. |
 | **Safe to spend** | One number: what you can spend each day until payday, after the bills and subscriptions due before then. |
 | **Budget** | Monthly budgets with optional rollover, savings goals, bills, charts, search across your spending, and saving tips. |
