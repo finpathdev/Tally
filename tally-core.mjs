@@ -95,8 +95,7 @@ function firstOccurrence(anchor, cycle, from) {
 function occurrences(anchor, cycle, from, to) {
   const out = [];
   let { date, k } = firstOccurrence(anchor, cycle, from);
-  let n = 0;
-  while (date <= to && n++ < 800) {
+  while (date <= to) {
     out.push(date);
     date = stepCycle(anchor, cycle, ++k);
   }
@@ -184,8 +183,7 @@ export function paydaysBetween(pay, start, end) {
   if (!pay) return [];
   const out = [];
   let cursor = nextPaydayAfter(pay, addDays(start, -1));
-  let guard = 0;
-  while (cursor <= end && guard++ < 40) {
+  while (cursor <= end) {
     if (cursor >= start) out.push(cursor);
     const next = nextPaydayAfter(pay, cursor);
     if (next <= cursor) break;
@@ -1458,7 +1456,26 @@ function icsEscape(value) {
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
-    .replace(/\r?\n/g, "\\n");
+    .replace(/\r\n|\r|\n/g, "\\n");
+}
+
+function foldCalendarLine(line, encoder) {
+  if (encoder.encode(line).length <= 75) return line;
+  const parts = [];
+  let part = "";
+  let bytes = 0;
+  for (const character of line) {
+    const size = encoder.encode(character).length;
+    if (bytes + size > 75) {
+      parts.push(part);
+      part = " ";
+      bytes = 1;
+    }
+    part += character;
+    bytes += size;
+  }
+  parts.push(part);
+  return parts.join("\r\n");
 }
 
 /** A calendar file for renewals and bills. Amounts are omitted unless includeAmounts is set. */
@@ -1499,7 +1516,8 @@ export function icsCalendar(events, { name = "Tally", includeAmounts = false } =
     lines.push("END:VEVENT");
   }
   lines.push("END:VCALENDAR");
-  return `${lines.join("\r\n")}\r\n`;
+  const encoder = new TextEncoder();
+  return `${lines.map((line) => foldCalendarLine(line, encoder)).join("\r\n")}\r\n`;
 }
 
 globalThis.TallyCore = {
