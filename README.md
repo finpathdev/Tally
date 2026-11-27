@@ -30,13 +30,13 @@ A local-first money dashboard. No account, no server, no tracking: your data sta
 
 It installs like an app (click **Get the app**: there's a QR code to open it on your phone, and steps for iPhone, Android and computers), works offline, and has light and dark themes.
 
-Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, the running total, reminder timing, the year review, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. The ten built-in languages include Today, reminders, Year in Tally, rollover, search, the import review, and the empty states. Arabic lays the screen out from right to left.
+Tally is a static folder. The app lives in `index.html`. The money math (safe to spend, splits, cart tax, rollover, the running total, reminder timing, the year review, bank CSV) lives in `tally-core.mjs` so it can be tested. Nothing phones home. English and the ten built-in translations cover Today, reminders, Year in Tally, rollover, search, the import review, and the empty states. Arabic lays the screen out from right to left.
 
 ## Files
 
 | File | What it is |
 | :-- | :-- |
-| `index.html` | The app: screens, styles and built-in languages. Open it in a browser to use it. |
+| `index.html` | The app: screens, styles and built-in languages. Serve it over HTTP to use it. |
 | `tally-core.mjs` | The money math, loaded by the page and precached for offline use. |
 | `lang-extra.mjs` | Translations for the newer sentences, packed into `index.html` |
 | `tally-icon.svg`, `tally-icon-192.png`, `tally-icon-512.png`, `tally-icon-maskable-512.png`, `tally-apple-touch-icon.png` | The logo in the sizes browsers and phones need |
@@ -85,7 +85,7 @@ npm run test:smoke
 
 ## Edit it
 
-`tally-core.mjs` is the readable money math. `index.html` is minified so the site loads quickly, which makes the screens harder to edit by hand. Open `index.html` straight from your computer to try a change. Offline mode and the install button only work once it's on your website (https).
+`tally-core.mjs` is the readable money math. `index.html` is minified so the site loads quickly, which makes the screens harder to edit by hand. To preview changes locally, run `python -m http.server 8000` from this folder and open `http://localhost:8000/`. Use HTTPS when hosting Tally to enable offline mode and installation.
 
 Uploading a new `index.html` or `tally-core.mjs` also needs the matching `tally-sw.js`. The service worker's `VERSION` has to change or phones keep the previous copy.
 
