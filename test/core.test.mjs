@@ -5,6 +5,7 @@ import {
   allocate,
   balances,
   cartTotals,
+  chargesBetween,
   categorize,
   detectDateOrder,
   detectRecurring,
@@ -474,4 +475,30 @@ test("a broken save can be salvaged without dropping the readable rows", () => {
   assert.equal(fixed.budget.limits.Groceries, 4000);
   assert.equal(fixed.budget.spending.length, 1);
   assert.deepEqual(fixed.budget.rollover, ["Fun"]);
+});
+
+test("weekly paydays cover an entire year", () => {
+  const pay = { cycle: "weekly", payday: "2026-01-01" };
+  const dates = paydaysBetween(pay, "2026-01-01", "2026-12-31");
+  assert.equal(dates.length, 53);
+  assert.equal(dates.at(-1), "2026-12-31");
+});
+
+test("weekly subscriptions cover a long balance history", () => {
+  const sub = { anchor: "2000-01-01", cycle: "weekly", amount: 100 };
+  const charges = chargesBetween([sub], "2000-01-01", addDays(sub.anchor, 7 * 800));
+  assert.equal(charges.length, 801);
+  assert.equal(charges.at(-1).date, addDays(sub.anchor, 7 * 800));
+});
+
+test("calendar export folds Unicode text without losing characters", () => {
+  const name = "网球🎾".repeat(30);
+  const calendar = icsCalendar([
+    { uid: "lesson", date: "2026-12-01", summary: name, description: "Line 1\rLine 2\r\nLine 3" },
+  ]);
+  const encoder = new TextEncoder();
+  assert.ok(calendar.split("\r\n").every((line) => encoder.encode(line).length <= 75));
+  const unfolded = calendar.replace(/\r\n /g, "");
+  assert.ok(unfolded.includes(`SUMMARY:${name}\r\n`));
+  assert.ok(unfolded.includes("DESCRIPTION:Line 1\\nLine 2\\nLine 3\r\n"));
 });
