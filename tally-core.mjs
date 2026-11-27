@@ -5,6 +5,7 @@
  */
 
 const DAY = 86400000;
+const BILL_LOOKBACK_DAYS = 45;
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function isIsoDate(value) {
@@ -77,12 +78,6 @@ function stepCycle(anchor, cycle, k) {
   throw new RangeError(`Unknown cycle ${cycle}`);
 }
 
-function occurrenceIndex(anchor, cycle, on) {
-  let n = Math.floor(daysBetween(anchor, on) / CYCLE_STEP[cycle]) + 1;
-  while (stepCycle(anchor, cycle, n) > on) n--;
-  while (stepCycle(anchor, cycle, n + 1) <= on) n++;
-  return n;
-}
 
 function firstOccurrence(anchor, cycle, from) {
   if (anchor >= from) return { date: anchor, k: 0 };
@@ -192,38 +187,19 @@ export function paydaysBetween(pay, start, end) {
   return out;
 }
 
-function lastBillOnOrBefore(bill, on) {
-  if (bill.anchor > on) return null;
-  return stepCycle(bill.anchor, bill.cycle, occurrenceIndex(bill.anchor, bill.cycle, on));
-}
 
-function nextBillAfter(bill, on) {
-  if (bill.anchor > on) return bill.anchor;
-  return stepCycle(bill.anchor, bill.cycle, occurrenceIndex(bill.anchor, bill.cycle, on) + 1);
-}
 
 function paymentOn(bill, due) {
   return (bill.payments || []).find((p) => p.due === due);
 }
 
-function billStatus(bill, today) {
-  const last = lastBillOnOrBefore(bill, today);
-  if (last && !bill.autopay && !paymentOn(bill, last) && daysBetween(last, today) <= 45) {
-    return { due: last, state: last === today ? "due-soon" : "overdue" };
-  }
-  const due = nextBillAfter(bill, today);
-  return { due, state: paymentOn(bill, due) ? "paid" : bill.autopay ? "autopay" : "upcoming" };
-}
 
 function billsBeforePayday(bills, today, payday) {
   const until = addDays(payday, -1);
   const rows = [];
   for (const bill of bills || []) {
-    const status = billStatus(bill, today);
-    if (status.state === "overdue") {
-      rows.push({ label: bill.name, date: status.due, amount: bill.estimate, kind: "bill" });
-    }
-    for (const due of occurrences(bill.anchor, bill.cycle, today, until)) {
+    const from = bill.autopay ? today : addDays(today, -BILL_LOOKBACK_DAYS);
+    for (const due of occurrences(bill.anchor, bill.cycle, from, until)) {
       if (!paymentOn(bill, due)) {
         rows.push({ label: bill.name, date: due, amount: bill.estimate, kind: "bill" });
       }
@@ -1240,7 +1216,7 @@ export function attentionItems({ subscriptions = [], bills = [], today, snoozed 
   const hidden = (key) => snoozed[key] && snoozed[key] > today;
   for (const bill of bills) {
     const lead = Math.max(0, bill.leadDays || 0);
-    const from = addDays(today, -45);
+    const from = addDays(today, -BILL_LOOKBACK_DAYS);
     const to = addDays(today, lead);
     for (const date of occurrences(bill.anchor, bill.cycle || "monthly", from, to)) {
       if (paidDue(bill, date)) continue;
@@ -1311,7 +1287,7 @@ export function attentionItems({ subscriptions = [], bills = [], today, snoozed 
 /** Which stored reminders should notify today, including recent overdue ones. */
 export function dueReminders(schedule, today, { notified = [], snoozed = {} } = {}) {
   const seen = new Set(notified);
-  const oldest = addDays(today, -45);
+  const oldest = addDays(today, -BILL_LOOKBACK_DAYS);
   return (schedule || []).filter((item) => {
     const until = snoozed[item.key];
     if (until && until > today) return false;
