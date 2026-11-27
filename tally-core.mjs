@@ -118,6 +118,7 @@ export function nextPaydayAfter(pay, on) {
   if (!pay || !PAY_CYCLES.includes(pay.cycle) || !isIsoDate(pay.payday)) {
     throw new RangeError("Payday settings are incomplete");
   }
+  if (pay.startsOn && on < pay.startsOn) return pay.startsOn;
   const { cycle, payday } = pay;
   if (cycle === "weekly" || cycle === "biweekly") {
     const step = cycle === "weekly" ? 7 : 14;
@@ -1106,6 +1107,7 @@ function salvagePay(pay) {
     balanceOn: pay.balanceOn,
     keepAside: keep,
   };
+  if (isIsoDate(pay.startsOn)) out.startsOn = pay.startsOn;
   if (Array.isArray(pay.counted)) out.counted = pay.counted.filter((id) => typeof id === "string");
   return out;
 }

@@ -518,3 +518,14 @@ test("safe to spend reserves every unpaid recent bill occurrence", () => {
   const autopay = safeToSpend(pay, { bills: [{ ...bill, autopay: true }] }, "2026-11-21");
   assert.deepEqual(autopay.owed.map((row) => row.date), ["2026-11-21"]);
 });
+
+test("payday setup uses the entered first payday and includes bills before it", () => {
+  const pay = { pay: 10000, balance: 50000, cycle: "twice-monthly", payday: "2026-12-31",
+    startsOn: "2026-12-31", balanceOn: "2026-11-27" };
+  const bills = [{ name: "Internet", estimate: 6000, cycle: "monthly", anchor: "2026-12-03" }];
+  const result = safeToSpend(pay, { bills }, "2026-11-27");
+  assert.equal(result.nextPayday, "2026-12-31");
+  assert.equal(result.owedTotal, 6000);
+  assert.equal(result.perDay, 1294);
+  assert.deepEqual(paydaysBetween(pay, "2026-11-27", "2026-12-30"), []);
+});
