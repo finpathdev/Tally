@@ -437,6 +437,110 @@ Rules:
 @media (max-width:760px){.ask-fab span{clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}.ask-fab{width:46px;height:46px;padding:0;justify-content:center}.flow .figure{font-size:1.85rem;max-width:calc(100% - 60px);padding-right:58px}}
 /*$vite$:1*/
 </style>
+    <style>
+/* Shared visual styles for Tally's light and dark themes. */
+@media screen {
+  :root {
+    --paper: #eef3ed;
+    --card: #fcfdf9;
+    --card-2: #eaf0ea;
+    --line: #cbd7cd;
+    --line-2: #e0e8e0;
+    --r: 16px;
+    --gap: clamp(16px, 2.3vw, 26px);
+    --shadow: 0 1px 2px #1c2b4508, 0 12px 32px -22px #1c2b4555;
+    --primary-fill: #254e42;
+    --primary-text: #ffffff;
+  }
+
+  :root[data-theme=dark] {
+    --paper: #101921;
+    --card: #17232c;
+    --card-2: #1e2d37;
+    --line: #374956;
+    --line-2: #293a46;
+    --shadow: 0 2px 4px #0003, 0 16px 36px -24px #000a;
+    --primary-fill: #8bd6b9;
+    --primary-text: #10251e;
+  }
+
+  body {
+    background: radial-gradient(ellipse at 12% 0, var(--seal-bg), transparent 40rem), var(--paper);
+  }
+
+  .topbar {
+    background: color-mix(in srgb, var(--card) 94%, transparent);
+    border-bottom-color: var(--line-2);
+    box-shadow: 0 4px 20px -18px var(--ink);
+  }
+
+  .tabs { border-color: var(--line-2); }
+  .tab:hover:not([aria-current=page]) { background: var(--card); }
+  .tab[aria-current=page],
+  .btn-primary {
+    background: var(--primary-fill);
+    color: var(--primary-text);
+    border-color: var(--primary-fill);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary-fill) 88%, var(--primary-text));
+    border-color: var(--primary-fill);
+  }
+
+  main { padding-inline: clamp(16px, 3vw, 32px); }
+  .section-title {
+    font-size: clamp(1.9rem, 3.2vw, 2.65rem);
+    letter-spacing: -.035em;
+    overflow-wrap: anywhere;
+  }
+
+  .card { border-color: var(--line-2); }
+  .card h3 { line-height: 1.25; }
+  .card-head { row-gap: 8px; }
+  .empty {
+    background: color-mix(in srgb, var(--card-2) 45%, var(--card));
+    border-radius: var(--r);
+  }
+
+  .safe-card {
+    border-inline-start-color: var(--seal);
+    background: linear-gradient(115deg, var(--seal-bg), var(--card) 72%);
+  }
+  .safe-card.lvl-warn {
+    background: linear-gradient(115deg, var(--ochre-bg), var(--card) 72%);
+  }
+  .safe-card.lvl-over {
+    background: linear-gradient(115deg, var(--serial-bg), var(--card) 72%);
+  }
+  .safe-card.setup { background: var(--card); }
+
+  .flow-track { height: 8px; }
+  .flow .figure { overflow-wrap: anywhere; }
+
+  .btn { border-radius: 10px; }
+  .btn:disabled { cursor: default; }
+  input:not([type=checkbox]):not([type=radio]),
+  select, textarea {
+    border-radius: 10px;
+    background-color: var(--card);
+  }
+  .table th { background: var(--card-2); }
+  .table tbody tr:hover { background: color-mix(in srgb, var(--card-2) 45%, transparent); }
+
+  .dialog { border-radius: 20px; }
+  .dialog::backdrop { backdrop-filter: blur(4px); }
+
+  @media (max-width: 760px) {
+    .topbar { background: var(--card); }
+    .tabs {
+      border-top-color: var(--line);
+      box-shadow: 0 -6px 24px -20px var(--ink);
+    }
+    .tab { min-height: 44px; justify-content: center; }
+    .table tbody tr:hover { background: transparent; }
+  }
+}
+    </style>
   </head>
   <body>
     <div id="app">
