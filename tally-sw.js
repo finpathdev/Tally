@@ -3,7 +3,7 @@
  * - Precaches the whole app at install, so it opens offline from the first
  *   launch after installing. The file list and version are injected at build
  *   time by the `precache` plugin in vite.config.ts.
- * - Pages: network first (deploys show up), cached shell when offline.
+ * - Pages: use the installed shell and matching assets until an update activates.
  * - Hashed assets: cache first.
  * - A new version waits until the app asks it to take over, so an update
  *   never swaps code under someone mid-edit. The app shows a "Reload" toast.
@@ -12,7 +12,7 @@
  *   versioned files from jsDelivr are cached after the first scan so
  *   scanning also works offline. No photo or personal data is ever sent.
  */
-const VERSION = '20261123r1';
+const VERSION = '20261127r1';
 const PRECACHE = ["./tally-core.mjs","./tally-apple-touch-icon.png","./tally-gloock.woff2","./tally-hanken-grotesk.woff2","./tally-icon-192.png","./tally-icon-512.png","./tally-icon-maskable-512.png","./tally-icon.svg","./tally-manifest.webmanifest","./tally-martian-mono.woff2"];
 const CACHE = `tally-${VERSION}`;
 // Kept across app updates: the files are versioned in their URLs.
@@ -20,7 +20,10 @@ const OCR_CACHE = 'ocr-v1';
 const OCR_FILES = /^https:\/\/cdn\.jsdelivr\.net\/npm\/(tesseract\.js@|tesseract\.js-core@|@tesseract\.js-data\/|jsqr@)/;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', ...PRECACHE])));
+  const requests = ['./', ...PRECACHE].map((path) =>
+    new Request(new URL(path, self.registration.scope), { cache: 'reload' }),
+  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(requests)));
 });
 
 self.addEventListener('activate', (event) => {
@@ -36,6 +39,9 @@ self.addEventListener('message', (event) => {
   if (event.data === 'skip-waiting') self.skipWaiting();
   if (event.data === 'check-reminders') event.waitUntil(checkReminders());
 });
+
+const shellUrl = new URL(self.registration.scope);
+const indexPath = new URL('index.html', shellUrl).pathname;
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -54,22 +60,15 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {
+    if (url.pathname !== shellUrl.pathname && url.pathname !== indexPath) return;
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put('./', copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./', { ignoreSearch: true })),
+      caches.open(CACHE).then((cache) => cache.match(shellUrl.href)).then((hit) => hit || fetch(req)),
     );
     return;
   }
 
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then(
+    caches.open(CACHE).then((cache) => cache.match(req, { ignoreSearch: true })).then(
       (hit) =>
         hit ||
         fetch(req).then((res) => {
