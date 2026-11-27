@@ -502,3 +502,19 @@ test("calendar export folds Unicode text without losing characters", () => {
   assert.ok(unfolded.includes(`SUMMARY:${name}\r\n`));
   assert.ok(unfolded.includes("DESCRIPTION:Line 1\\nLine 2\\nLine 3\r\n"));
 });
+
+test("safe to spend reserves every unpaid recent bill occurrence", () => {
+  const pay = { pay: 50000, cycle: "weekly", payday: "2026-11-28", balance: 25000, balanceOn: "2026-11-21" };
+  const bill = {
+    name: "Weekly bill", estimate: 2000, cycle: "weekly", anchor: "2026-10-03",
+    payments: [{ due: "2026-11-14", amount: 2000 }],
+  };
+  const result = safeToSpend(pay, { bills: [bill] }, "2026-11-21");
+  assert.deepEqual(result.owed.map((row) => row.date), [
+    "2026-10-10", "2026-10-17", "2026-10-24", "2026-10-31", "2026-11-07", "2026-11-21",
+  ]);
+  assert.equal(result.owedTotal, 12000);
+  assert.equal(result.safe, 13000);
+  const autopay = safeToSpend(pay, { bills: [{ ...bill, autopay: true }] }, "2026-11-21");
+  assert.deepEqual(autopay.owed.map((row) => row.date), ["2026-11-21"]);
+});
