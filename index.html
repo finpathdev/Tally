@@ -519,10 +519,40 @@ Rules:
 
   .btn { border-radius: 10px; }
   .btn:disabled { cursor: default; }
-  input:not([type=checkbox]):not([type=radio]),
-  select, textarea {
-    border-radius: 10px;
+  .field { gap: 7px; }
+  .field-label { color: var(--ink); font-size: .875rem; font-weight: 650; }
+
+  /* Keep native pickers and compact inline controls usable. */
+  :is(input:not([type=checkbox], [type=radio], [type=file], [type=range], [type=color]), select, textarea):not(.composer input) {
+    min-width: 0;
+    min-height: 42px;
+    padding-inline: 12px;
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--card-2) 36%, var(--card));
+    border-color: color-mix(in srgb, var(--ink-3) 46%, var(--line));
+  }
+  .search input:not(.composer input) { padding-inline-start: 34px; }
+  .inline-field :is(input, select):not(.composer input),
+  .scan-items input:not([type=checkbox]) { min-height: 36px; }
+  textarea { padding-block: 10px; resize: vertical; }
+  :is(input, textarea)::placeholder { color: var(--ink-3); opacity: 1; }
+
+  :is(input:not([type=checkbox], [type=radio], [type=file], [type=range], [type=color]), select, textarea):not(.composer input):focus {
     background-color: var(--card);
+    border-color: var(--seal);
+    outline: 2px solid var(--seal);
+    outline-offset: 1px;
+  }
+  .composer:focus-within {
+    outline: 2px solid var(--seal);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 760px) {
+    :is(input:not([type=checkbox], [type=radio], [type=file], [type=range], [type=color]), select, textarea) {
+      font-size: max(1rem, 16px);
+    }
+    .field :is(input, select, textarea):not(.composer input) { min-height: 44px; }
   }
   .table th { background: var(--card-2); }
   .table tbody tr:hover { background: color-mix(in srgb, var(--card-2) 45%, transparent); }
